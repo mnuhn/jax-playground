@@ -1,4 +1,4 @@
-'Display the contents of the MNIST dataset with minimal boilerplate.'
+'Train LeNet on MNIST "from scratch" using JAX.'
 import argparse
 import numpy as np
 from tqdm import tqdm
