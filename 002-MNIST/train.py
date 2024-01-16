@@ -22,12 +22,12 @@ NUM_COLS = 28
 p = argparse.ArgumentParser(description='...')
 p.add_argument('--batch_size', type=int, default=32)
 p.add_argument('--optimizer',
-               choices=['sgd', 'adam', 'self_sgd'], default='sgd')
-p.add_argument('--learning_rate', type=float, default=0.01)
+               choices=['sgd', 'adam', 'self_sgd'], default='adam')
+p.add_argument('--learning_rate', type=float, default=0.001)
 p.add_argument('--learning_rate_decay', type=float, default=0.01)
 p.add_argument('--learning_rate_decay_epoch_step', type=int, default=10)
-p.add_argument('--bias_term', type=bool, default=False)
-p.add_argument('--layers', type=str, default='800,10')
+p.add_argument('--bias_term', type=bool, default=True)
+p.add_argument('--layers', type=str, default='120,84,10')
 p.add_argument('--epochs', type=float, default=300)
 
 args = p.parse_args()
