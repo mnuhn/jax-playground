@@ -1,0 +1,7 @@
+png/
+models/
+predictions/
+data/
+timeseries.lt2023.npy
+timeseries.2023.npy
+scripts/download.sh
