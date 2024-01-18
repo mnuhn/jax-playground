@@ -23,7 +23,8 @@ END="31.${MONTH}.${YEAR}"
 
 mkdir -p data/${WHAT}/
 
-# curl \
-#  -X POST \
-#  URL_HERE_FIGURE_IT_OUT_YOURSELF \
-#  > data/${WHAT}/${YEAR}-${MONTH}.html
+curl \
+  -X POST \
+  https://www.tecson-data.ch/zurich/${WHAT}/uebersicht/messwerte.php \
+  -d "messw_beg=${START}&messw_end=${END}&felder%5B%5D=Temp2m&felder%5B%5D=Feuchte&felder%5B%5D=WGmax&felder%5B%5D=WGavr&felder%5B%5D=Umr_Beaufort&felder%5B%5D=WRvek&felder%5B%5D=Windchill&felder%5B%5D=TempWasser&felder%5B%5D=LuftdruckQFE&felder%5B%5D=Taupunkt&auswahl=2&combilog=tiefenbrunnen&suchen=Werte+anzeigen" \
+  > data/${WHAT}/${YEAR}-${MONTH}.html

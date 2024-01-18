@@ -4,29 +4,48 @@ import io
 import numpy as np
 from datetime import datetime
 from tqdm import tqdm
+import argparse
+import os
 
-date_format = "%d.%m.%Y %H:%M:%S"
+def file_doesnt_exist(fn):
+  if os.path.exists(fn):
+    raise argparse.ArgumentTypeError(f"File '{fn}' already exists.")
+  return fn
 
-field_names = ["date", "airtemp", "humidity", "gust_speed", "wind_speed", "wind_strength", "wind_dir", "wind_chill", "water_temp", "air_pressure", "dew_point"]
+parser = argparse.ArgumentParser(description="Process the location option.")
+parser.add_argument("--location", type=str, choices=["tiefenbrunnen", "mythenquai"], required=True)
+parser.add_argument("--output_file", type=file_doesnt_exist, required=True)
+parser.add_argument("--min_year", type=int, default=None)
+parser.add_argument("--max_year", type=int, default=None)
+args = parser.parse_args()
 
-fs = sorted(glob.glob("./tiefenbrunnen/20??-??.html"))
+DATE_FORMAT = "%d.%m.%Y %H:%M:%S"
 
-data = []
+FIELD_NAMES = ["date", "airtemp", "humidity", "gust_speed", "wind_speed",
+               "wind_strength", "wind_dir", "wind_chill", "water_temp",
+               "air_pressure", "dew_point"]
+
+
+def skip(year):
+  if args.min_year and year < args.min_year:
+    return True
+  if args.max_year and year > args.max_year:
+    return True
+  return False
+
 
 def extract_ym(fn):
   fn = fn.split("/")[-1]
   year = int(fn.split("-")[0])
   month = int(fn.split("-")[1].split(".")[0])
+  assert month > 0 and month < 13 and year > 2000 and year < 2030
 
-  assert month > 0
-  assert month < 13
-  assert year > 2019
-  assert year < 2025
   return year, month
 
-for f in tqdm(fs):
-  year, month = extract_ym(f)
-  f = io.open(f, encoding="utf-8", errors='replace')
+def parse_html(fn):
+  data = []
+
+  f = io.open(fn, encoding="utf-8", errors='replace')
   soup = BeautifulSoup(f,features="lxml" )
   tables = soup.find_all('table')
   table = tables[1]
@@ -36,9 +55,9 @@ for f in tqdm(fs):
     # Extract data from each cell in the row
     cells = row.find_all(['th', 'td'])
     cells = [cell.text.strip() for cell in cells]
-    assert len(cells) == len(field_names)
+    assert len(cells) == len(FIELD_NAMES)
     if not first:
-      d = datetime.strptime(cells[0], date_format)
+      d = datetime.strptime(cells[0], DATE_FORMAT)
       cells = [d.year, d.month, d.day, d.hour, d.minute, d.second] + cells[1:]
       for i in range(1,len(cells)):
         cells[i] = float(cells[i])
@@ -50,5 +69,24 @@ for f in tqdm(fs):
       #cells = np.array(cells, dtype=np.float32)
       data.append(cells)
     first = False
+  return data
+
+fns = sorted(glob.glob(f"./{args.location}/20??-??.html"))
+
+print(f"Found {len(fns)} files.")
+
+data = []
+
+for fn in tqdm(fns):
+  year, month = extract_ym(fn)
+  if skip(year):
+    print(f"skipping {fn}")
+    continue
+
+  cur_data = parse_html(fn)
+  print(f"found {len(cur_data)} entries in {fn}")
+
+  data.extend(cur_data)
+
 data = np.array(data)
-np.save("./timeseries", data)
+np.save(args.output_file, data)
