@@ -9,7 +9,7 @@ date_format = "%d.%m.%Y %H:%M:%S"
 
 field_names = ["date", "airtemp", "humidity", "gust_speed", "wind_speed", "wind_strength", "wind_dir", "wind_chill", "water_temp", "air_pressure", "dew_point"]
 
-fs = sorted(glob.glob("./data/20??-??.html"))
+fs = sorted(glob.glob("./tiefenbrunnen/20??-??.html"))
 
 data = []
 
