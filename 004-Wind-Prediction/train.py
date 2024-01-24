@@ -19,10 +19,12 @@ import model
 p = argparse.ArgumentParser(description='...')
 p.add_argument('--batch_size', type=int, default=16)
 p.add_argument('--channels', type=int, default=20)
+p.add_argument('--num_convs', type=int, default=2)
 p.add_argument('--conv_len', type=int, default=8)
 p.add_argument('--down_scale', type=int, default=2)
 p.add_argument('--batch_norm', type=bool, default=False)
 p.add_argument('--dropout', type=float, default=0.0)
+p.add_argument('--num_dense', type=int, default=1)
 p.add_argument('--dense_size', type=int, default=100)
 p.add_argument('--learning_rate', type=float, default=0.001)
 p.add_argument('--iters', type=float, default=150000)
@@ -63,7 +65,9 @@ if p.model == "cnn":
   m = model.CNN(
           channels=p.channels,
           conv_len=p.conv_len,
+          num_convs=p.num_convs,
           dense_size=p.dense_size,
+          num_dense=p.num_dense,
           down_scale=p.down_scale,
           predictions=predictions,
           batch_norm=p.batch_norm,
@@ -132,6 +136,13 @@ def train_step(state: TrainState, x, y):
           }, x,train=True, rngs={'dropout': dropout_key}, mutable=['batch_stats'])
       loss = jnp.mean((preds-y)**2)
       return loss, (preds, updates)
+    elif p.batch_norm:
+      preds, updates = state.apply_fn({
+          'params': params,
+          'batch_stats': state.batch_stats,
+          }, x,train=True, mutable=['batch_stats'])
+      loss = jnp.mean((preds-y)**2)
+      return loss, (preds, updates)
     elif p.dropout > 0.0:
       preds = state.apply_fn({
           'params': params,
@@ -164,7 +175,9 @@ def eval_step(state: TrainState, x, y):
     preds = state.apply_fn({'params': state.params}, x=x, train=False)
 
   #jax.debug.print("batch_stats={batch_stats}", batch_stats=state.batch_stats)
+  jax.debug.print("x={x}", x=x)
   jax.debug.print("preds={preds}", preds=preds)
+  jax.debug.print("y={y}", y=y)
   loss = jnp.mean((preds-y)**2)
   return state, loss
 
@@ -179,6 +192,7 @@ eval_loss = 0.0
 summary_writer.hparams(hparams = {
     'batch_size': int(p.batch_size),
     'batch_norm': bool(p.batch_norm),
+    'num_dense': int(p.num_dense),
     'dense_size': int(p.dense_size),
     'learning_rate': p.learning_rate,
     'down_scale': int(p.down_scale),

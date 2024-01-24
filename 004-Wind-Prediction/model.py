@@ -46,8 +46,10 @@ class LSTM(nn.Module):
 class CNN(nn.Module):
   channels: int
   down_scale: int
+  num_convs: int
   conv_len: int
   dense_size: int
+  num_dense: int
   predictions: int
   batch_norm: bool
   dropout: float
@@ -60,43 +62,23 @@ class CNN(nn.Module):
   @nn.compact
   def __call__(self, x, train: bool):
 
-    x = nn.Conv(features=self.channels, kernel_size=(self.conv_len,), padding='VALID')(x)
+    # Convolutions.
+    for i in range(0,self.num_convs):
+      x = nn.Conv(features=self.channels, kernel_size=(self.conv_len,), padding='VALID')(x)
 
-    if self.batch_norm:
-      x = nn.BatchNorm(use_running_average=not train)(x)
+      if self.batch_norm:
+        x = nn.BatchNorm(use_running_average=not train)(x)
 
-    if self.dropout > 0.0:
-      x = nn.Dropout(rate=0.5, deterministic=not train)(x)
+      if self.dropout > 0.0:
+        x = nn.Dropout(rate=0.5, deterministic=not train)(x)
 
-    x = nn.relu(x)
-    x = nn.max_pool(x, window_shape=(self.down_scale,), strides=(self.down_scale,))
-
-    x = nn.Conv(features=self.channels*2, kernel_size=(self.conv_len,))(x)
-
-    if self.batch_norm:
-      x = nn.BatchNorm(use_running_average=not train)(x)
-
-    if self.dropout > 0.0:
-      x = nn.Dropout(rate=0.5, deterministic=not train)(x)
-
-    x = nn.relu(x)
-    x = nn.max_pool(x, window_shape=(self.down_scale,), strides=(self.down_scale,))
-
-    x = nn.Conv(features=self.channels*4, kernel_size=(self.conv_len,))(x)
-
-    if self.batch_norm:
-      x = nn.BatchNorm(use_running_average=not train)(x)
-
-    if self.dropout > 0.0:
-      x = nn.Dropout(rate=0.5, deterministic=not train)(x)
-
-    x = nn.relu(x)
-    x = nn.max_pool(x, window_shape=(self.down_scale,), strides=(self.down_scale,))
+      x = nn.relu(x)
+      x = nn.max_pool(x, window_shape=(self.down_scale,), strides=(self.down_scale,))
 
     x = x.reshape((x.shape[0], -1))  # flatten
 
     # Dense layers.
-    for i in range(0,1):
+    for i in range(0,self.num_dense):
       x = nn.Dense(features=self.dense_size, kernel_init=initializers.glorot_uniform())(x)
 
       if self.batch_norm:
