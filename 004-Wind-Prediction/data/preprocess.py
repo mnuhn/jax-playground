@@ -23,15 +23,17 @@ AIR_PRESSURE = 14
 DEW_POINT = 15
 
 # Extended fields
-FIELDS.extend(["datetime", "sin_hour", "cos_hour", "sin_wind_dir", "cos_wind_dir"])
+FIELDS.extend(["sin_hour", "cos_hour", "sin_month", "cos_month", "sin_wind_dir", "cos_wind_dir", "datetime"])
 
 SIN_HOUR = 16
 COS_HOUR = 17
-SIN_WIND_DIR = 18
-COS_WIND_DIR = 19
+SIN_MONTH = 18
+COS_MONTH = 19
+SIN_WIND_DIR = 20
+COS_WIND_DIR = 21
 
-DATETIME = 20
-GAP = 21
+DATETIME = 22
+GAP = 23
 
 def range_to_unit(data, y_min, y_max):
   assert y_min < y_max
@@ -56,14 +58,20 @@ def preprocess_features(data):
   # Add 2 new fields.
   data = np.c_[data, data[:,HOUR]]
   data = np.c_[data, data[:,HOUR]]
-  data[:,SIN_HOUR] = jnp.sin(2.0 * np.pi * data[:, SIN_HOUR] / 24.0)
-  data[:,COS_HOUR] = jnp.cos(2.0 * np.pi * data[:, COS_HOUR] / 24.0)
+  data[:,SIN_HOUR] = 0.5 * ( 1.0 + jnp.sin(2.0 * np.pi * data[:, SIN_HOUR] / 24.0))
+  data[:,COS_HOUR] = 0.5 * ( 1.0 + jnp.cos(2.0 * np.pi * data[:, COS_HOUR] / 24.0))
+
+  # Add 2 new fields.
+  data = np.c_[data, data[:,MONTH]]
+  data = np.c_[data, data[:,MONTH]]
+  data[:,SIN_MONTH] = 0.5 * ( 1.0 + jnp.sin(2.0 * np.pi * data[:, SIN_MONTH] / 12.0))
+  data[:,COS_MONTH] = 0.5 * ( 1.0 + jnp.cos(2.0 * np.pi * data[:, COS_MONTH] / 12.0))
 
   # Add 2 new fields.
   data = np.c_[data, data[:,WIND_DIR]]
   data = np.c_[data, data[:,WIND_DIR]]
-  data[:,SIN_WIND_DIR] = jnp.sin(2.0 * np.pi * data[:, SIN_WIND_DIR] / 360.0)
-  data[:,COS_WIND_DIR] = jnp.cos(2.0 * np.pi * data[:, COS_WIND_DIR] / 360.0)
+  data[:,SIN_WIND_DIR] = 0.5 * ( 1.0 + jnp.sin(2.0 * np.pi * data[:, SIN_WIND_DIR] / 360.0))
+  data[:,COS_WIND_DIR] = 0.5 * ( 1.0 + jnp.cos(2.0 * np.pi * data[:, COS_WIND_DIR] / 360.0))
   data[:,WIND_DIR] = range_to_unit(data[:,WIND_DIR], 0.0, 359.0)
 
   # Add 1 new field.

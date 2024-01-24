@@ -20,8 +20,10 @@ def file_doesnt_exist(fn):
 parser = argparse.ArgumentParser(description="Process the location option.")
 parser.add_argument("--files", type=str, required=True)
 parser.add_argument("--output_file", type=file_doesnt_exist, required=True)
-parser.add_argument('--features', type=str, default="wind_speed,gust_speed")
+parser.add_argument('--features', type=str, default="wind_speed,gust_speed,air_pressure,air_temp,sin_wind_dir,cos_wind_dir,sin_hour,cos_hour")
 parser.add_argument('--test_year', type=int, default=2023)
+parser.add_argument('--history', type=int, default=257)
+parser.add_argument('--future', type=int, default=128)
 args = parser.parse_args()
 
 def generate_examples(fns, history, predictions, column_names, test_year=args.test_year, permute=True):
@@ -98,4 +100,7 @@ def generate_examples(fns, history, predictions, column_names, test_year=args.te
   np.savez(args.output_file, x_train=X, y_train=Y, x_test=XT, y_test=YT)
 
 
-generate_examples(args.files.split(","), history=257, predictions=128, column_names=args.features.split(","))
+generate_examples(args.files.split(","),
+                  history=args.history,
+                  predictions=args.future,
+                  column_names=args.features.split(","))
