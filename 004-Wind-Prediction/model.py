@@ -1,27 +1,38 @@
 import flax.linen as nn
 import jax.numpy as jnp
+import jax
+from flax.linen import initializers
+from flax import traverse_util
+from jax import tree_util
 
-class CNN(nn.Module):
-  channels: int
-  down_scale: int
-  conv_len: int
-  dense_size: int
+class LSTM(nn.Module):
   predictions: int
+  hidden_state_dim: int
+  dense_size: int
 
   def setup(self):
     pass
 
   @nn.compact
   def __call__(self, x):
-    x = nn.Conv(features=self.channels, kernel_size=(1, self.conv_len))(x)
-    x = nn.sigmoid(x)
-    x = nn.max_pool(x, window_shape=(1, self.down_scale), strides=(1, self.down_scale))
-    x = nn.Conv(features=self.channels, kernel_size=(1, self.conv_len))(x)
-    x = nn.sigmoid(x)
-    x = nn.max_pool(x, window_shape=(1, self.down_scale), strides=(1, self.down_scale))
-    x = x.reshape((x.shape[0], -1))  # flatten
+    cell = nn.OptimizedLSTMCell(self.hidden_state_dim)
+    def body_fn(cell, carry, x):
+      return cell(carry, x)
+    scan = nn.scan(
+      body_fn, variable_broadcast="params",
+      split_rngs={"params": False}, in_axes=1, out_axes=1)
+
+    print(x.shape)
+    input_shape =  x[:, 0, :].shape
+    carry = cell.initialize_carry(
+      jax.random.key(0), input_shape)
+    carry, x = scan(cell, carry, x)
+
+    # Take only last hidden state.
+    x = x[:,-1,:]
     x = nn.Dense(features=self.dense_size)(x)
     x = nn.sigmoid(x)
+
     x = nn.Dense(features=self.predictions)(x)
     x = nn.sigmoid(x)
     return x
@@ -31,5 +42,71 @@ class CNN(nn.Module):
     r = jnp.mean((p-y)**2)
     return r
 
-def loss_pred(p,y):
-  return jnp.mean((p-y)**2)
+
+class CNN(nn.Module):
+  channels: int
+  down_scale: int
+  conv_len: int
+  dense_size: int
+  predictions: int
+  batch_norm: bool
+  dropout: float
+
+  def setup(self):
+    pass
+
+  # TODO: Implement array of convolutions
+  # TODO: Implement array of dense
+  @nn.compact
+  def __call__(self, x, train: bool):
+
+    x = nn.Conv(features=self.channels, kernel_size=(self.conv_len,), padding='VALID')(x)
+
+    if self.batch_norm:
+      x = nn.BatchNorm(use_running_average=not train)(x)
+
+    if self.dropout > 0.0:
+      x = nn.Dropout(rate=0.5, deterministic=not train)(x)
+
+    x = nn.relu(x)
+    x = nn.max_pool(x, window_shape=(self.down_scale,), strides=(self.down_scale,))
+
+    x = nn.Conv(features=self.channels*2, kernel_size=(self.conv_len,))(x)
+
+    if self.batch_norm:
+      x = nn.BatchNorm(use_running_average=not train)(x)
+
+    if self.dropout > 0.0:
+      x = nn.Dropout(rate=0.5, deterministic=not train)(x)
+
+    x = nn.relu(x)
+    x = nn.max_pool(x, window_shape=(self.down_scale,), strides=(self.down_scale,))
+
+    x = nn.Conv(features=self.channels*4, kernel_size=(self.conv_len,))(x)
+
+    if self.batch_norm:
+      x = nn.BatchNorm(use_running_average=not train)(x)
+
+    if self.dropout > 0.0:
+      x = nn.Dropout(rate=0.5, deterministic=not train)(x)
+
+    x = nn.relu(x)
+    x = nn.max_pool(x, window_shape=(self.down_scale,), strides=(self.down_scale,))
+
+    x = x.reshape((x.shape[0], -1))  # flatten
+
+    # Dense layers.
+    for i in range(0,1):
+      x = nn.Dense(features=self.dense_size, kernel_init=initializers.glorot_uniform())(x)
+
+      if self.batch_norm:
+        x = nn.BatchNorm(use_running_average=not train)(x)
+
+      if self.dropout > 0.0:
+        x = nn.Dropout(rate=0.5, deterministic=not train)(x)
+
+      x = nn.relu(x)
+
+    x = nn.Dense(features=self.predictions, kernel_init=initializers.glorot_uniform())(x)
+    x = nn.sigmoid(x)
+    return x

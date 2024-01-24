@@ -15,8 +15,6 @@ def file_doesnt_exist(fn):
 parser = argparse.ArgumentParser(description="Process the location option.")
 parser.add_argument("--location", type=str, choices=["tiefenbrunnen", "mythenquai"], required=True)
 parser.add_argument("--output_file", type=file_doesnt_exist, required=True)
-parser.add_argument("--min_year", type=int, default=None)
-parser.add_argument("--max_year", type=int, default=None)
 args = parser.parse_args()
 
 DATE_FORMAT = "%d.%m.%Y %H:%M:%S"
@@ -24,15 +22,6 @@ DATE_FORMAT = "%d.%m.%Y %H:%M:%S"
 FIELD_NAMES = ["date", "airtemp", "humidity", "gust_speed", "wind_speed",
                "wind_strength", "wind_dir", "wind_chill", "water_temp",
                "air_pressure", "dew_point"]
-
-
-def skip(year):
-  if args.min_year and year < args.min_year:
-    return True
-  if args.max_year and year > args.max_year:
-    return True
-  return False
-
 
 def extract_ym(fn):
   fn = fn.split("/")[-1]
@@ -79,9 +68,6 @@ data = []
 
 for fn in tqdm(fns):
   year, month = extract_ym(fn)
-  if skip(year):
-    print(f"skipping {fn}")
-    continue
 
   cur_data = parse_html(fn)
   print(f"found {len(cur_data)} entries in {fn}")

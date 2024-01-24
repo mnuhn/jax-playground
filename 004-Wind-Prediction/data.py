@@ -1,5 +1,13 @@
 import numpy as np
 import jax.numpy as jnp
+import datetime
+from tqdm import tqdm
+
+# TODO:
+# * Docstrings
+# * Comments
+# * Variable Names
+# * Break down functions
 
 FIELDS = ["year", "month", "day", "hour", "minute", "seconds", "air_temp", "humidity", "gust_speed", "wind_speed", "wind_strength", "wind_dir", "wind_chill", "water_temp", "air_pressure", "dew_point"]
 FIELDS.extend(["sin_hour", "cos_hour", "sin_wind_dir", "cos_wind_dir"])
@@ -19,38 +27,44 @@ def get_data(fn, column_names, history, predictions, split_frac=0.8, permute=Tru
   if np.any(np.isnan(data)):
     print("data has nan")
 
-  # Virtual indexes, see below.
-  data = np.c_[data, data[:,FIELDS.index("hour")]]
-  data = np.c_[data, data[:,FIELDS.index("hour")]]
-  data = np.c_[data, data[:,FIELDS.index("wind_dir")]]
-  data = np.c_[data, data[:,FIELDS.index("wind_dir")]]
-
-  data[:,FIELDS.index("wind_speed")] = range_to_unit(data[:,FIELDS.index("wind_speed")], 0.0, 25.0)
-  data[:,FIELDS.index("gust_speed")] = range_to_unit(data[:,FIELDS.index("gust_speed")], 0.0, 25.0)
-  data[:,FIELDS.index("air_pressure")] = range_to_unit(data[:,FIELDS.index("air_pressure")], 950.0, 1050.0)
-  data[:,FIELDS.index("air_temp")] = range_to_unit(data[:,FIELDS.index("air_temp")], -15.0, 40.0)
-  data[:,FIELDS.index("water_temp")] = range_to_unit(data[:,FIELDS.index("water_temp")], 0.0, 30.0)
-  data[:,FIELDS.index("minute")] = range_to_unit(data[:,FIELDS.index("minute")], 0.0, 59.0)
-
-  data[:,FIELDS.index("sin_hour")] = jnp.sin(2.0 * np.pi * data[:, FIELDS.index("sin_hour")] / 24.0)
-  data[:,FIELDS.index("cos_hour")] = jnp.cos(2.0 * np.pi * data[:, FIELDS.index("cos_hour")] / 24.0)
-  data[:,FIELDS.index("hour")] = range_to_unit(data[:,FIELDS.index("hour")], 0.0, 24.0)
-
-  data[:,FIELDS.index("sin_wind_dir")] = jnp.sin(2.0 * np.pi * data[:, FIELDS.index("sin_wind_dir")] / 360.0)
-  data[:,FIELDS.index("cos_wind_dir")] = jnp.cos(2.0 * np.pi * data[:, FIELDS.index("cos_wind_dir")] / 360.0)
-  data[:,FIELDS.index("wind_dir")] = range_to_unit(data[:,FIELDS.index("hour")], 0.0, 359.0)
+  data_orig = data
+  data = preprocess.preprocess_features(data)
 
   # The first column is the one to be predicted.
   columns=[FIELDS.index(i) for i in column_names]
 
   data = data[:,columns]
-
   data_size = len(data)
+  
+  # Pre-allocate data.
   X_ALL = np.zeros((data_size - history, history, len(columns)-1))
   Y_ALL = np.zeros((data_size - history, predictions))
-  for i in range(history, data_size - predictions):
+
+  # Find gaps in data
+  skipped_entries = 0
+
+  datetimes = np.array([f"{int(year)}-{int(month):02d}-{int(day):02d}T{int(hour):02d}:{int(minute):02d}:{int(second):02d}"
+                      for year, month, day, hour, minute, second in data_orig[:, :6]], dtype='datetime64[m]')
+
+  # Compute all positions where data is not 10m apart.
+  gaps = np.diff(datetimes) != np.timedelta64(10, 'm')
+  gaps = np.insert(gaps, 0, False)
+  print("num gaps ", np.sum(gaps))
+
+  idxs_to_delete = []
+  for i in tqdm(range(history, data_size - predictions)):
+    if np.sum(gaps[i-history:i]) > 0:
+      idxs_to_delete.append(i)
+
+    # Skip entries for which there is a gap in time
     X_ALL[i-history,:] = data[i-history:i,1:]
     Y_ALL[i-history,:] = np.squeeze(data[i:i+predictions,0]) # just windspeed
+
+  # Delete entries with gaps.
+  print("Prior to deletions", X_ALL.shape, Y_ALL.shape)
+  X_ALL = np.delete(X_ALL, idxs_to_delete, axis=0)
+  Y_ALL = np.delete(Y_ALL, idxs_to_delete, axis=0)
+  print("After deletions", X_ALL.shape, Y_ALL.shape)
 
   if permute:
     np.random.seed(0)
@@ -61,6 +75,8 @@ def get_data(fn, column_names, history, predictions, split_frac=0.8, permute=Tru
     X_ALL_PERM = X_ALL
     Y_ALL_PERM = Y_ALL
 
+  print("skipped entries", skipped_entries)
+
   SPLIT = int(data.shape[0] * split_frac)
 
   X = X_ALL_PERM[:SPLIT]
@@ -70,11 +86,3 @@ def get_data(fn, column_names, history, predictions, split_frac=0.8, permute=Tru
   YT = Y_ALL_PERM[SPLIT:]
 
   return X, Y, XT, YT
-
-def getbatch(X,Y,batch_size):
-  while True:
-    perm = np.random.permutation(X.shape[0])
-    X = X[perm]
-    Y = Y[perm]
-    for i in range(0, int(len(X)/batch_size)):
-      yield X[i*batch_size:(i+1)*batch_size,:], Y[i*batch_size:(i+1)*batch_size]
