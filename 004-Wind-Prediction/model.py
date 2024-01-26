@@ -22,7 +22,6 @@ class LSTM(nn.Module):
       body_fn, variable_broadcast="params",
       split_rngs={"params": False}, in_axes=1, out_axes=1)
 
-    print(x.shape)
     input_shape =  x[:, 0, :].shape
     carry = cell.initialize_carry(
       jax.random.key(0), input_shape)
@@ -53,6 +52,7 @@ class CNN(nn.Module):
   predictions: int
   batch_norm: bool
   dropout: float
+  padding: str
 
   def setup(self):
     pass
@@ -64,7 +64,7 @@ class CNN(nn.Module):
 
     # Convolutions.
     for i in range(0,self.num_convs):
-      x = nn.Conv(features=self.channels, kernel_size=(self.conv_len,), padding='VALID')(x)
+      x = nn.Conv(features=self.channels, kernel_size=(self.conv_len,), padding=self.padding)(x)
 
       if self.batch_norm:
         x = nn.BatchNorm(use_running_average=not train)(x)

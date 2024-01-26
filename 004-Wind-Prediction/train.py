@@ -10,8 +10,11 @@ import jax.numpy as jnp
 import numpy as np
 import optax
 import flax
+import os
+import sys
 from flax.training import train_state
 from flax.metrics import tensorboard
+import draw2
 
 import data
 import model
@@ -23,16 +26,19 @@ p.add_argument('--num_convs', type=int, default=2)
 p.add_argument('--conv_len', type=int, default=8)
 p.add_argument('--down_scale', type=int, default=2)
 p.add_argument('--batch_norm', type=bool, default=False)
+p.add_argument('--draw', type=bool, default=False)
 p.add_argument('--dropout', type=float, default=0.0)
 p.add_argument('--num_dense', type=int, default=1)
+p.add_argument('--padding', type=str, default='VALID')
 p.add_argument('--dense_size', type=int, default=100)
 p.add_argument('--learning_rate', type=float, default=0.001)
-p.add_argument('--iters', type=float, default=150000)
+p.add_argument('--epochs', type=float, default=10)
 p.add_argument('--data', type=str)
 p.add_argument('--debug_every_percent', type=int, default=1)
 p.add_argument('--model', type=str, default=None)
+p.add_argument('--prefix', type=str, default="")
 p.add_argument('--model_name', type=str, default=None)
-p.add_argument('--log_dir', type=str, default="./tensorboard/default")
+p.add_argument('--log_dir', type=str, default=None)
 p = p.parse_args()
 
 def params_debug_str():
@@ -52,13 +58,18 @@ with np.load(p.data) as data:
   history = X.shape[1]
   predictions = Y.shape[1]
 
-print(X.shape)
-print(Y.shape)
+history_len = X.shape[1]
+feature_cnt = X.shape[2]
+predict_len = Y.shape[1]
 
-print(XT.shape)
-print(YT.shape)
+if p.log_dir == None:
+  p.log_dir = f'./tensorboard/{p.prefix}historylen{history_len}-featurecnt{feature_cnt}-predictlen{predict_len}-model{p.model}-convs{p.num_convs}-convlen{p.conv_len}-chans{p.channels}-padding{p.padding}-densesize{p.dense_size}-numdense{p.num_dense}-lr{p.learning_rate}-bs{p.batch_size}'
 
-print("batch_norm", p.batch_norm)
+print("Logging to", p.log_dir)
+
+if os.path.exists(p.log_dir):
+  print("Logging dir already exists. Stopping")
+  sys.exit(1)
 
 m = None
 if p.model == "cnn":
@@ -72,6 +83,7 @@ if p.model == "cnn":
           predictions=predictions,
           batch_norm=p.batch_norm,
           dropout=p.dropout,
+          padding=p.padding,
           )
 elif p.model == "lstm":
   m = model.LSTM(
@@ -165,7 +177,7 @@ def train_step(state: TrainState, x, y):
   state = state.apply_gradients(grads=grads)
   if p.batch_norm:
     state = state.replace(batch_stats=updates['batch_stats'])
-  return state, cur_train_loss
+  return state, cur_train_loss, grads
 
 #@jax.jit
 def eval_step(state: TrainState, x, y):
@@ -181,16 +193,24 @@ def eval_step(state: TrainState, x, y):
   loss = jnp.mean((preds-y)**2)
   return state, loss
 
-pbar = tqdm(range(int(p.iters)))
-epoch=0.0
+examples = X.shape[0]
+iters = int(p.epochs * (examples / p.batch_size))
 
-every_iters = int(p.iters / 100.0 * p.debug_every_percent)
+print(f"Having {examples} examples and batch size {p.batch_size},")
+print(f"to run {p.epochs} epochs need to run {iters}.")
+
+pbar = tqdm(range(int(iters)))
+
+every_iters = int(iters / 100.0 * p.debug_every_percent)
 
 debug_str = params_debug_str()
 eval_loss = 0.0
 
 summary_writer.hparams(hparams = {
     'batch_size': int(p.batch_size),
+    'feature_cnt': int(feature_cnt),
+    'history_len': int(history_len),
+    'predict_len': int(predict_len),
     'batch_norm': bool(p.batch_norm),
     'num_dense': int(p.num_dense),
     'dense_size': int(p.dense_size),
@@ -198,22 +218,49 @@ summary_writer.hparams(hparams = {
     'down_scale': int(p.down_scale),
     'conv_len': int(p.conv_len),
     'channels': int(p.channels),
+    'num_convs': int(p.num_convs),
     'model': p.model,
     })
 
 for i in pbar:
-  if i > p.iters:
+  if i > iters:
     break
   (x, y) = next(batcher)
   #print("Train Step")
   #print(state.batch_stats)
-  state, train_loss = train_step(state, x, y)
+  state, train_loss, grads = train_step(state, x, y)
   train_loss = train_loss ** 0.5
 
-  if i % 1000 == 0:
+  if i % every_iters == 0:
     _, eval_loss = eval_step(state, XT, YT)
     eval_loss = eval_loss ** 0.5
     summary_writer.scalar('eval_loss', eval_loss, i)
+    for k in range(0, p.num_dense):
+      summary_writer.histogram(f'Dense_{k}-Kernel', jax.device_get(state.params[f'Dense_{k}']['kernel']), step=i)
+      summary_writer.histogram(f'Dense_{k}-Bias', jax.device_get(state.params[f'Dense_{k}']['bias']), step=i)
+    for k in range(0, p.num_convs):
+      summary_writer.histogram(f'Conv_{k}-Kernel', jax.device_get(state.params[f'Conv_{k}']['kernel']), step=i)
+      summary_writer.histogram(f'Conv_{k}-Bias', jax.device_get(state.params[f'Conv_{k}']['bias']), step=i)
+
+    if p.draw:
+      v = draw2.visualizer((p.conv_len+2)*10*30,3*(p.channels)*20)
+
+      # Channels.
+      k = jax.device_get(state.params['Conv_0']['kernel'])
+      k = k - np.min(k)
+      k = k / np.max(k)
+      k = k * 255
+      for j in range(0,k.shape[1]): 
+        v.box(k[:,j,:], x0=j*(k.shape[0]+1)*10, y0=20, width=10)
+      k2 = jax.device_get(state.params['Conv_1']['kernel'])
+      k2 = k2 - np.min(k2)
+      k2 = k2 / np.max(k2)
+      k2 = k2 * 255
+      for j in range(0,k2.shape[1]): 
+        v.box(k2[:,j,:], x0=j*(k2.shape[0]+1)*10, y0=20+(p.channels+2)*10, width=10)
+      v.save(f"./png/test{i}.png")
+      del v
+
     #jax.debug.print("kernel_shape={x}",x=state.params['Conv_0']['kernel'].shape)
     #jax.debug.print("kernel={x}",x=jnp.transpose(state.params['Conv_0']['kernel'],axes=[2,1,0]))
 
