@@ -24,6 +24,7 @@ parser.add_argument('--features', type=str, default="wind_speed,gust_speed,air_p
 parser.add_argument('--test_year', type=int, default=2023)
 parser.add_argument('--history', type=int, default=257)
 parser.add_argument('--future', type=int, default=128)
+parser.add_argument('--copy', type=bool, default=False)
 args = parser.parse_args()
 
 def generate_examples(fns, history, predictions, column_names, test_year=args.test_year, permute=True):
@@ -58,7 +59,12 @@ def generate_examples(fns, history, predictions, column_names, test_year=args.te
       continue
 
     X_ALL[out_idx,:] = data[i-history:i,:]
-    Y_ALL[out_idx,:] = np.squeeze(data[i:i+predictions,preprocess.WIND_SPEED]) # just windspeed
+    if args.copy:
+      print("WARNING: THIS GENERATES DATA WITH OVERLAPPING HISTORY AND PREDS")
+      print("WARNING: THIS GENERATES DATA WITH OVERLAPPING HISTORY AND PREDS")
+      Y_ALL[out_idx,:] = np.squeeze(data[i-history:i-history+predictions,preprocess.WIND_SPEED]) # just windspeed
+    else:
+      Y_ALL[out_idx,:] = np.squeeze(data[i:i+predictions,preprocess.WIND_SPEED]) # just windspeed
 
     out_idx += 1
 
