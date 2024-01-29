@@ -71,7 +71,7 @@ class CNN(nn.Module):
         x = nn.BatchNorm(use_running_average=not train)(x)
 
       if self.dropout > 0.0:
-        x = nn.Dropout(rate=0.5, deterministic=not train)(x)
+        x = nn.Dropout(rate=self.dropout, deterministic=not train)(x)
 
       x = nn.relu(x)
       x = nn.max_pool(x, window_shape=(self.down_scale,), strides=(self.down_scale,))
@@ -86,7 +86,7 @@ class CNN(nn.Module):
         x = nn.BatchNorm(use_running_average=not train)(x)
 
       if self.dropout > 0.0:
-        x = nn.Dropout(rate=0.5, deterministic=not train)(x)
+        x = nn.Dropout(rate=self.dropout, deterministic=not train)(x)
 
       x = nn.relu(x)
 
