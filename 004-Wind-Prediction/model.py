@@ -50,6 +50,7 @@ class CNN(nn.Module):
   dense_size: int
   num_dense: int
   predictions: int
+  features_per_prediction: int
   batch_norm: bool
   dropout: float
   padding: str
@@ -90,5 +91,6 @@ class CNN(nn.Module):
       x = nn.relu(x)
 
     x = nn.Dense(features=self.predictions, kernel_init=initializers.glorot_uniform())(x)
+    x = nn.Dense(features=self.predictions*self.features_per_prediction, kernel_init=initializers.glorot_uniform())(x)
     x = nn.sigmoid(x)
-    return x
+    x = x.reshape((-1, self.predictions, self.features_per_prediction))

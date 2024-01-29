@@ -14,7 +14,6 @@ import os
 import sys
 from flax.training import train_state
 from flax.metrics import tensorboard
-import draw2
 
 import data
 import model
@@ -55,15 +54,21 @@ with np.load(p.data) as data:
   XT = data['x_test']
   YT = data['y_test']
 
+  if len(Y.shape) < 3:
+    # Ensure 1 separate dimension for the to-be-predicted features.
+    YT = np.expand_dims(YT, 2)
+    Y = np.expand_dims(Y, 2)
+
   history = X.shape[1]
   predictions = Y.shape[1]
 
 history_len = X.shape[1]
-feature_cnt = X.shape[2]
+history_feature_cnt = X.shape[2]
 predict_len = Y.shape[1]
+predict_feature_cnt = Y.shape[2]
 
 if p.log_dir == None:
-  p.log_dir = f'./tensorboard/{p.prefix}historylen{history_len}-featurecnt{feature_cnt}-predictlen{predict_len}-model{p.model}-convs{p.num_convs}-convlen{p.conv_len}-chans{p.channels}-padding{p.padding}-densesize{p.dense_size}-numdense{p.num_dense}-lr{p.learning_rate}-bs{p.batch_size}'
+  p.log_dir = f'./tensorboard/{p.prefix}lossfac{p.loss_fac}-historylen{history_len}-historyfeaturecnt{history_feature_cnt}-predictlen{predict_len}-predictfeaturecnt{predict_feature_cnt}model{p.model}-convs{p.num_convs}-convlen{p.conv_len}-dscale{p.down_scale}-chans{p.channels}-padding{p.padding}-densesize{p.dense_size}-numdense{p.num_dense}-lr{p.learning_rate}-bs{p.batch_size}'
 
 print("Logging to", p.log_dir)
 
@@ -81,6 +86,7 @@ if p.model == "cnn":
           num_dense=p.num_dense,
           down_scale=p.down_scale,
           predictions=predictions,
+          features_per_prediction=predict_feature_cnt,
           batch_norm=p.batch_norm,
           dropout=p.dropout,
           padding=p.padding,
@@ -208,7 +214,7 @@ eval_loss = 0.0
 
 summary_writer.hparams(hparams = {
     'batch_size': int(p.batch_size),
-    'feature_cnt': int(feature_cnt),
+    'history_feature_cnt': int(history_feature_cnt),
     'history_len': int(history_len),
     'predict_len': int(predict_len),
     'batch_norm': bool(p.batch_norm),
