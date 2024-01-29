@@ -23,6 +23,7 @@ p.add_argument('--batch_size', type=int, default=16)
 p.add_argument('--channels', type=int, default=20)
 p.add_argument('--num_convs', type=int, default=2)
 p.add_argument('--conv_len', type=int, default=8)
+p.add_argument('--nonconv_features', type=int, default=0)
 p.add_argument('--down_scale', type=int, default=2)
 p.add_argument('--batch_norm', type=bool, default=False)
 p.add_argument('--draw', type=bool, default=False)
@@ -90,6 +91,7 @@ if p.model == "cnn":
           batch_norm=p.batch_norm,
           dropout=p.dropout,
           padding=p.padding,
+          nonconv_features=p.nonconv_features,
           )
 elif p.model == "lstm":
   m = model.LSTM(

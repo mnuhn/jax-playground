@@ -53,6 +53,7 @@ class CNN(nn.Module):
   features_per_prediction: int
   batch_norm: bool
   dropout: float
+  nonconv_features: int
   padding: str
 
   def setup(self):
@@ -62,7 +63,11 @@ class CNN(nn.Module):
   # TODO: Implement array of dense
   @nn.compact
   def __call__(self, x, train: bool):
+    if self.nonconv_features > 0:
+      last_features = x[:,-1,-self.nonconv_features:]
+      rest = x[:,:,:-self.nonconv_features]
 
+      x = rest
     # Convolutions.
     for i in range(0,self.num_convs):
       x = nn.Conv(features=self.channels, kernel_size=(self.conv_len,), padding=self.padding)(x)
@@ -78,6 +83,9 @@ class CNN(nn.Module):
 
     x = x.reshape((x.shape[0], -1))  # flatten
 
+
+    if self.nonconv_features > 0:
+      x = jnp.concatenate([x, last_features], axis=1)
     # Dense layers.
     for i in range(0,self.num_dense):
       x = nn.Dense(features=self.dense_size, kernel_init=initializers.glorot_uniform())(x)
