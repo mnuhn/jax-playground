@@ -1,7 +1,7 @@
 from PIL import Image, ImageDraw
 import numpy as np
 
-class visualizer():
+class Visualizer():
   def __init__(self,width,height):
     self.im = Image.new(mode="RGB", size=(width, height))
     self.id = ImageDraw.Draw(self.im)
@@ -10,7 +10,6 @@ class visualizer():
     self.im.save(fn)
 
   def box(self, arr, x0, y0, width):
-
     for i in range(arr.shape[0]):
       for j in range(arr.shape[1]):
         v = int(arr[i,j])

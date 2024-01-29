@@ -93,7 +93,7 @@ def draw(x_values_history, history, x_values_prediction, predictions, last_predi
     if i == 0:
       w = 2.0
     axs.plot(x_values_prediction, predictions[i], linewidth=w, color=COLORS[i], label=label,zorder=3)
-  
+
   rect = patches.Rectangle((x_values_prediction[0], 0.0), 100, 1.0, linewidth=1, edgecolor='r', facecolor='white', zorder=2, alpha=0.8)
   axs.add_patch(rect)
   axs.axvline(x_values_prediction[0], color=(0,0,0),zorder=3)
@@ -116,6 +116,6 @@ for i in range(0, X.shape[0]):
   x_values_history = (np.arange(len(X[i, :, 0])) + i) / 6.0
   x_values_prediction = (np.arange(len(predictions[0]))) / 6.0 + x_values_history[-1]
   draw(x_values_history, history, x_values_prediction, predictions, last_predictions, fn=f'./png/{i:04d}.png')
-  
+
   last_predictions.insert(0, [x_values_prediction, predictions])
   last_predictions = last_predictions[:100]

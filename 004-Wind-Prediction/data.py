@@ -35,7 +35,7 @@ def get_data(fn, column_names, history, predictions, split_frac=0.8, permute=Tru
 
   data = data[:,columns]
   data_size = len(data)
-  
+
   # Pre-allocate data.
   X_ALL = np.zeros((data_size - history, history, len(columns)-1))
   Y_ALL = np.zeros((data_size - history, predictions))
