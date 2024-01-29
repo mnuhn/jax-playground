@@ -48,7 +48,7 @@ def generate_examples(fns, history, predictions, history_features, predict_featu
   data = preprocess.preprocess_features(data)
   data_size = len(data)
 
-  
+
   # Pre-allocate data.
   X_ALL = np.zeros((data_size - history, history, data.shape[1]), dtype=np.float32)
   Y_ALL = np.zeros((data_size - history, predictions, data.shape[1]), dtype=np.float32)

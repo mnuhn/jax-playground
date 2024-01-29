@@ -249,23 +249,10 @@ for i in pbar:
       summary_writer.histogram(f'Conv_{k}-Bias', jax.device_get(state.params[f'Conv_{k}']['bias']), step=i)
 
     if p.draw:
-      v = draw2.visualizer((p.conv_len+2)*10*30,3*(p.channels)*20)
-
-      # Channels.
-      k = jax.device_get(state.params['Conv_0']['kernel'])
-      k = k - np.min(k)
-      k = k / np.max(k)
-      k = k * 255
-      for j in range(0,k.shape[1]): 
-        v.box(k[:,j,:], x0=j*(k.shape[0]+1)*10, y0=20, width=10)
-      k2 = jax.device_get(state.params['Conv_1']['kernel'])
-      k2 = k2 - np.min(k2)
-      k2 = k2 / np.max(k2)
-      k2 = k2 * 255
-      for j in range(0,k2.shape[1]): 
-        v.box(k2[:,j,:], x0=j*(k2.shape[0]+1)*10, y0=20+(p.channels+2)*10, width=10)
-      v.save(f"./png/test{i}.png")
-      del v
+      m.draw(f"./png/test{i}-001.png", state, activations, example=0)
+      m.draw(f"./png/test{i}-002.png", state, activations, example=1)
+      m.draw(f"./png/test{i}-003.png", state, activations, example=2)
+      m.draw(f"./png/test{i}-004.png", state, activations, example=3)
 
     #jax.debug.print("kernel_shape={x}",x=state.params['Conv_0']['kernel'].shape)
     #jax.debug.print("kernel={x}",x=jnp.transpose(state.params['Conv_0']['kernel'],axes=[2,1,0]))
