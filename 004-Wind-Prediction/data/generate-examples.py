@@ -20,14 +20,15 @@ def file_doesnt_exist(fn):
 parser = argparse.ArgumentParser(description="Process the location option.")
 parser.add_argument("--files", type=str, required=True)
 parser.add_argument("--output_file", type=file_doesnt_exist, required=True)
-parser.add_argument('--features', type=str, default="wind_speed,gust_speed,air_pressure,air_temp,sin_wind_dir,cos_wind_dir,sin_hour,cos_hour")
 parser.add_argument('--test_year', type=int, default=2023)
 parser.add_argument('--history', type=int, default=257)
 parser.add_argument('--future', type=int, default=128)
 parser.add_argument('--copy', type=bool, default=False)
+parser.add_argument('--history_features', type=str, default="wind_speed,gust_speed,air_pressure,air_temp,sin_wind_dir,cos_wind_dir,sin_hour,cos_hour")
+parser.add_argument('--predict_features', type=str, default='wind_speed')
 args = parser.parse_args()
 
-def generate_examples(fns, history, predictions, column_names, test_year=args.test_year, permute=True):
+def generate_examples(fns, history, predictions, history_features, predict_features, test_year=args.test_year, permute=True):
   data = None
 
   for fn in fns:
@@ -40,7 +41,8 @@ def generate_examples(fns, history, predictions, column_names, test_year=args.te
     print("data has nan")
 
   # The first column is the one to be predicted.
-  columns = [preprocess.FIELDS.index(i) for i in column_names]
+  history_columns = [preprocess.FIELDS.index(i) for i in history_features]
+  predict_columns = [preprocess.FIELDS.index(i) for i in predict_features]
 
   data_orig = data
   data = preprocess.preprocess_features(data)
@@ -49,7 +51,7 @@ def generate_examples(fns, history, predictions, column_names, test_year=args.te
   
   # Pre-allocate data.
   X_ALL = np.zeros((data_size - history, history, data.shape[1]), dtype=np.float32)
-  Y_ALL = np.zeros((data_size - history, predictions), dtype=np.float32)
+  Y_ALL = np.zeros((data_size - history, predictions, data.shape[1]), dtype=np.float32)
 
   out_idx = 0
   skipped = 0
@@ -62,9 +64,9 @@ def generate_examples(fns, history, predictions, column_names, test_year=args.te
     if args.copy:
       print("WARNING: THIS GENERATES DATA WITH OVERLAPPING HISTORY AND PREDS")
       print("WARNING: THIS GENERATES DATA WITH OVERLAPPING HISTORY AND PREDS")
-      Y_ALL[out_idx,:] = np.squeeze(data[i-history:i-history+predictions,preprocess.WIND_SPEED]) # just windspeed
+      Y_ALL[out_idx,:] = np.squeeze(data[i-history:i-history+predictions,:]) # just windspeed
     else:
-      Y_ALL[out_idx,:] = np.squeeze(data[i:i+predictions,preprocess.WIND_SPEED]) # just windspeed
+      Y_ALL[out_idx,:] = np.squeeze(data[i:i+predictions,:]) # just windspeed
 
     out_idx += 1
 
@@ -73,7 +75,7 @@ def generate_examples(fns, history, predictions, column_names, test_year=args.te
   print("Prior to deletions", X_ALL.shape, Y_ALL.shape)
 
   X_ALL = X_ALL[:out_idx, :, :]
-  Y_ALL = Y_ALL[:out_idx, :]
+  Y_ALL = Y_ALL[:out_idx, :, :]
 
   print("After deletions", X_ALL.shape, Y_ALL.shape)
   print("Years:", np.unique(X_ALL[:, :, preprocess.YEAR]))
@@ -84,11 +86,12 @@ def generate_examples(fns, history, predictions, column_names, test_year=args.te
   print("#test:", np.sum(test_mask))
   print("#train:", np.sum(train_mask))
 
-  X_ALL = X_ALL[:, :, columns]
+  X_ALL = X_ALL[:, :, history_columns]
+  Y_ALL = Y_ALL[:, :, predict_columns]
   X  = X_ALL[train_mask, :, :]
-  Y  = Y_ALL[train_mask, :]
+  Y  = Y_ALL[train_mask, :, :]
   XT = X_ALL[test_mask, :, :]
-  YT = Y_ALL[test_mask, :]
+  YT = Y_ALL[test_mask, :, :]
 
   print("Train", X.shape, Y.shape)
   print("Test", XT.shape, YT.shape)
@@ -109,4 +112,5 @@ def generate_examples(fns, history, predictions, column_names, test_year=args.te
 generate_examples(args.files.split(","),
                   history=args.history,
                   predictions=args.future,
-                  column_names=args.features.split(","))
+                  history_features=args.history_features.split(","),
+                  predict_features=args.predict_features.split(","))
