@@ -1,6 +1,7 @@
 import flax.linen as nn
 import jax.numpy as jnp
 import jax
+import numpy as np
 from flax.linen import initializers
 from flax import traverse_util
 from jax import tree_util
@@ -62,15 +63,31 @@ class CNN(nn.Module):
   # TODO: Implement array of convolutions
   # TODO: Implement array of dense
   @nn.compact
-  def __call__(self, x, train: bool):
+  def __call__(self, x, train: bool, debug:bool = False):
+    debug_output = {}
+
+    if debug:
+      debug_output["input"] = x
+
     if self.nonconv_features > 0:
       last_features = x[:,-1,-self.nonconv_features:]
       rest = x[:,:,:-self.nonconv_features]
 
+      if debug:
+        debug_output["last_features"] = last_features
+        debug_output["rest"] = rest
       x = rest
+
+    if debug:
+      debug_output["input_conv"] = x
+
     # Convolutions.
     for i in range(0,self.num_convs):
+      name = f'conv_{i}'
       x = nn.Conv(features=self.channels, kernel_size=(self.conv_len,), padding=self.padding)(x)
+
+      if debug:
+        debug_output[f"{name}_conv"] = x
 
       if self.batch_norm:
         x = nn.BatchNorm(use_running_average=not train)(x)
@@ -79,17 +96,33 @@ class CNN(nn.Module):
         x = nn.Dropout(rate=self.dropout, deterministic=not train)(x)
 
       x = nn.relu(x)
+
+      if debug:
+        debug_output[f"{name}_relu"] = x
+
       x = nn.max_pool(x, window_shape=(self.down_scale,), strides=(self.down_scale,))
+
+      if debug:
+        debug_output[f"{name}_pooled"] = x
 
     x = x.reshape((x.shape[0], -1))  # flatten
 
+    if debug:
+      debug_output["conv_reshaped"] = x
 
     if self.nonconv_features > 0:
       x = jnp.concatenate([x, last_features], axis=1)
+
+    if debug:
+      debug_output["conv_reshaped_with_nonconv_features"] = x
+
     # Dense layers.
     for i in range(0,self.num_dense):
+      name = f'dense_{i}'
+      debug_output[f"{name}_in"] = x
       x = nn.Dense(features=self.dense_size, kernel_init=initializers.glorot_uniform())(x)
 
+      debug_output[f"{name}_mult"] = x
       if self.batch_norm:
         x = nn.BatchNorm(use_running_average=not train)(x)
 
@@ -98,7 +131,18 @@ class CNN(nn.Module):
 
       x = nn.relu(x)
 
-    x = nn.Dense(features=self.predictions, kernel_init=initializers.glorot_uniform())(x)
+      if debug:
+        debug_output[f"{name}_relu"] = x
+
     x = nn.Dense(features=self.predictions*self.features_per_prediction, kernel_init=initializers.glorot_uniform())(x)
     x = nn.sigmoid(x)
+
     x = x.reshape((-1, self.predictions, self.features_per_prediction))
+
+    if debug:
+      debug_output["final"] = x
+
+    if debug:
+      return x, debug_output
+
+    return x
