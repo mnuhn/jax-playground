@@ -10,6 +10,7 @@ def test_my_custom_layer():
     BATCH_SIZE=16
     HISTORY=8
     INPUT_FEATURES=10
+    NUM_CONVS=1
     NON_CONV_FEATURES=2
     CONV_CHANNELS=11
     FEATURES_PER_PREDICTION=3
@@ -18,7 +19,7 @@ def test_my_custom_layer():
     m = model.CNN(
             channels=CONV_CHANNELS,
             conv_len=5,
-            num_convs=1,
+            num_convs=NUM_CONVS,
             dense_size=25,
             num_dense=10,
             down_scale=2,
@@ -42,7 +43,8 @@ def test_my_custom_layer():
     assert debug["input"].shape == (BATCH_SIZE,HISTORY,INPUT_FEATURES)
     assert debug["input_conv"].shape == (BATCH_SIZE, HISTORY, INPUT_FEATURES - NON_CONV_FEATURES)
 
-    assert debug["conv_0_conv"].shape == (BATCH_SIZE, HISTORY, CONV_CHANNELS)
+    if NUM_CONVS > 0:
+      assert debug["conv_0_conv"].shape == (BATCH_SIZE, HISTORY, CONV_CHANNELS)
     assert debug["final"].shape == (BATCH_SIZE,PREDICTIONS,FEATURES_PER_PREDICTION)
 
     for name in debug.keys():
