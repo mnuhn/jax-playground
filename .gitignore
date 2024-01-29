@@ -5,3 +5,4 @@
 .history-*
 .ipynb_checkpoints
 __pycache__
+jax-env
