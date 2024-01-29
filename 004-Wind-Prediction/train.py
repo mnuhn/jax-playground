@@ -22,6 +22,7 @@ p = argparse.ArgumentParser(description='...')
 p.add_argument('--batch_size', type=int, default=16)
 p.add_argument('--channels', type=int, default=20)
 p.add_argument('--num_convs', type=int, default=2)
+p.add_argument('--loss_fac', type=float, default=1.0)
 p.add_argument('--conv_len', type=int, default=8)
 p.add_argument('--nonconv_features', type=int, default=0)
 p.add_argument('--down_scale', type=int, default=2)
@@ -146,6 +147,13 @@ state = TrainState.create(
   tx = optax.adam(learning_rate=p.learning_rate)
 )
 
+def scaled_loss(preds, y, non_first_fac):
+  loss = (preds-y)**2
+  # Downscale weight of non-primary features.
+  loss = loss.at[:,:,1:].set(loss[:,:,1:]*non_first_fac)
+  loss = jnp.mean(loss)
+  return loss
+
 @jax.jit
 def train_step(state: TrainState, x, y):
   def loss_fn(params):
@@ -154,24 +162,24 @@ def train_step(state: TrainState, x, y):
           'params': params,
           'batch_stats': state.batch_stats,
           }, x,train=True, rngs={'dropout': dropout_key}, mutable=['batch_stats'])
-      loss = jnp.mean((preds-y)**2)
+      loss = scaled_loss(preds, y, p.loss_fac)
       return loss, (preds, updates)
     elif p.batch_norm:
       preds, updates = state.apply_fn({
           'params': params,
           'batch_stats': state.batch_stats,
           }, x,train=True, mutable=['batch_stats'])
-      loss = jnp.mean((preds-y)**2)
+      loss = scaled_loss(preds, y, p.loss_fac)
       return loss, (preds, updates)
     elif p.dropout > 0.0:
       preds = state.apply_fn({
           'params': params,
           }, x,train=True, rngs={'dropout': dropout_key})
-      loss = jnp.mean((preds-y)**2)
+      loss = scaled_loss(preds, y, p.loss_fac)
       return loss, (preds, )
     else:
       preds = state.apply_fn({'params': params}, x,train=True)
-      loss = jnp.mean((preds-y)**2)
+      loss = scaled_loss(preds, y, p.loss_fac)
       return loss, (preds,)
 
     #jax.debug.print("params={params}", params=params['Dense_1']['kernel'])
