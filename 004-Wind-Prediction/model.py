@@ -44,9 +44,8 @@ class LSTM(nn.Module):
 
 
 class CNN(nn.Module):
-  channels: int
+  conv_channels: list[int]
   down_scale: int
-  num_convs: int
   conv_len: int
   dense_size: int
   num_dense: int
@@ -82,9 +81,9 @@ class CNN(nn.Module):
       debug_output["input_conv"] = x
 
     # Convolutions.
-    for i in range(0,self.num_convs):
+    for i in range(0,len(self.conv_channels)):
       name = f'conv_{i}'
-      x = nn.Conv(features=self.channels, kernel_size=(self.conv_len,), padding=self.padding)(x)
+      x = nn.Conv(features=self.conv_channels[i], kernel_size=(self.conv_len,), padding=self.padding)(x)
 
       if debug:
         debug_output[f"{name}_conv"] = x

@@ -20,7 +20,7 @@ import model
 
 p = argparse.ArgumentParser(description='...')
 p.add_argument('--batch_size', type=int, default=16)
-p.add_argument('--channels', type=int, default=20)
+p.add_argument('--conv_channels', type=str, default="20")
 p.add_argument('--num_convs', type=int, default=2)
 p.add_argument('--loss_fac', type=float, default=1.0)
 p.add_argument('--conv_len', type=int, default=8)
@@ -81,9 +81,8 @@ if os.path.exists(p.log_dir):
 m = None
 if p.model == "cnn":
   m = model.CNN(
-          channels=p.channels,
+          conv_channels=conv_channels,
           conv_len=p.conv_len,
-          num_convs=p.num_convs,
           dense_size=p.dense_size,
           num_dense=p.num_dense,
           down_scale=p.down_scale,
