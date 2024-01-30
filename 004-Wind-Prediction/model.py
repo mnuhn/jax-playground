@@ -2,9 +2,11 @@ import flax.linen as nn
 import jax.numpy as jnp
 import jax
 import numpy as np
+
 from flax.linen import initializers
 from flax import traverse_util
 from jax import tree_util
+from visualizer import Visualizer
 
 class LSTM(nn.Module):
   predictions: int
@@ -121,6 +123,7 @@ class CNN(nn.Module):
       x = nn.Dense(features=self.dense_size, kernel_init=initializers.glorot_uniform())(x)
 
       debug_output[f"{name}_act"] = x
+
       if self.batch_norm:
         x = nn.BatchNorm(use_running_average=not train)(x)
 
