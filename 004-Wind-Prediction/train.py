@@ -14,6 +14,7 @@ import os
 import sys
 from flax.training import train_state
 from flax.metrics import tensorboard
+from visualizer import Visualizer
 
 import data
 import model
@@ -77,6 +78,8 @@ print("Logging to", p.log_dir)
 if os.path.exists(p.log_dir):
   print("Logging dir already exists. Stopping")
   sys.exit(1)
+
+conv_channels = [ int(x) for x in p.conv_channels.split(",") ]
 
 m = None
 if p.model == "cnn":
@@ -232,8 +235,8 @@ summary_writer.hparams(hparams = {
     'learning_rate': p.learning_rate,
     'down_scale': int(p.down_scale),
     'conv_len': int(p.conv_len),
-    'channels': int(p.channels),
-    'num_convs': int(p.num_convs),
+    # ADD conv channels
+    'num_convs': int(len(conv_channels)),
     'model': p.model,
     })
 
