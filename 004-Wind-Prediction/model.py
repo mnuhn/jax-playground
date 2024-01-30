@@ -118,10 +118,9 @@ class CNN(nn.Module):
     # Dense layers.
     for i in range(0,self.num_dense):
       name = f'dense_{i}'
-      debug_output[f"{name}_in"] = x
       x = nn.Dense(features=self.dense_size, kernel_init=initializers.glorot_uniform())(x)
 
-      debug_output[f"{name}_mult"] = x
+      debug_output[f"{name}_act"] = x
       if self.batch_norm:
         x = nn.BatchNorm(use_running_average=not train)(x)
 
@@ -134,9 +133,11 @@ class CNN(nn.Module):
         debug_output[f"{name}_relu"] = x
 
     x = nn.Dense(features=self.predictions*self.features_per_prediction, kernel_init=initializers.glorot_uniform())(x)
-    x = nn.sigmoid(x)
-
     x = x.reshape((-1, self.predictions, self.features_per_prediction))
+    debug_output[f"{name}_final_act"] = x
+
+    x = nn.sigmoid(x)
+    debug_output[f"{name}_final_sigmoid"] = x
 
     if debug:
       debug_output["final"] = x
