@@ -250,21 +250,20 @@ for i in pbar:
   train_loss = train_loss ** 0.5
 
   if i % every_iters == 0:
-    _, eval_loss = eval_step(state, XT, YT)
+    _, eval_loss, debug = eval_step(state, XT, YT)
     eval_loss = eval_loss ** 0.5
     summary_writer.scalar('eval_loss', eval_loss, i)
-    for k in range(0, p.num_dense):
-      summary_writer.histogram(f'Dense_{k}-Kernel', jax.device_get(state.params[f'Dense_{k}']['kernel']), step=i)
-      summary_writer.histogram(f'Dense_{k}-Bias', jax.device_get(state.params[f'Dense_{k}']['bias']), step=i)
-    for k in range(0, p.num_convs):
-      summary_writer.histogram(f'Conv_{k}-Kernel', jax.device_get(state.params[f'Conv_{k}']['kernel']), step=i)
-      summary_writer.histogram(f'Conv_{k}-Bias', jax.device_get(state.params[f'Conv_{k}']['bias']), step=i)
+    for k in grads.keys():
+      for l in grads[k]:
+        print(k, l, np.mean(grads[k][l]))
 
     if p.draw:
-      m.draw(f"./png/test{i}-001.png", state, activations, example=0)
-      m.draw(f"./png/test{i}-002.png", state, activations, example=1)
-      m.draw(f"./png/test{i}-003.png", state, activations, example=2)
-      m.draw(f"./png/test{i}-004.png", state, activations, example=3)
+      for j in range(0,10):
+        v = Visualizer(1200,1600)
+        debug["truth"] = YT
+        v.draw_dict(debug, num=j)
+        v.save(f"./png/{p.prefix}-test{i:05d}-{j:03d}.png")
+        del v
 
     #jax.debug.print("kernel_shape={x}",x=state.params['Conv_0']['kernel'].shape)
     #jax.debug.print("kernel={x}",x=jnp.transpose(state.params['Conv_0']['kernel'],axes=[2,1,0]))
