@@ -24,7 +24,6 @@ import model
 p = argparse.ArgumentParser(description='...')
 p.add_argument('--batch_size', type=int, default=16)
 p.add_argument('--conv_channels', type=str, default="20")
-p.add_argument('--num_convs', type=int, default=2)
 p.add_argument('--loss_fac', type=float, default=1.0)
 p.add_argument('--conv_len', type=int, default=8)
 p.add_argument('--nonconv_features', type=int, default=0)
@@ -74,7 +73,7 @@ predict_len = Y.shape[1]
 predict_feature_cnt = Y.shape[2]
 
 if p.log_dir == None:
-  p.log_dir = f'./tensorboard/{p.prefix}lossfac{p.loss_fac}-historylen{history_len}-historyfeaturecnt{history_feature_cnt}-predictlen{predict_len}-predictfeaturecnt{predict_feature_cnt}model{p.model}-convs{p.num_convs}-convlen{p.conv_len}-dscale{p.down_scale}-chans{p.conv_channels}-padding{p.padding}-densesize{p.dense_size}-numdense{p.num_dense}-lr{p.learning_rate}-bs{p.batch_size}'
+  p.log_dir = f'./tensorboard/{p.prefix}lossfac{p.loss_fac}-historylen{history_len}-historyfeaturecnt{history_feature_cnt}-predictlen{predict_len}-predictfeaturecnt{predict_feature_cnt}model{p.model}-convs{p.num_convs}-convlen{len(conv_channels)}-dscale{p.down_scale}-chans{p.conv_channels}-padding{p.padding}-densesize{p.dense_size}-numdense{p.num_dense}-lr{p.learning_rate}-bs{p.batch_size}'
 
 print("Logging to", p.log_dir)
 
