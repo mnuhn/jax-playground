@@ -159,6 +159,7 @@ state = TrainState.create(
 
 def scaled_loss(preds, y, non_first_fac):
   loss = (preds-y)**2
+  #loss = jaxopt.loss.huber_loss(target=y, pred=preds, delta=0.2)
   # Downscale weight of non-primary features.
   loss = loss.at[:,:,1:].set(loss[:,:,1:]*non_first_fac)
   loss = jnp.mean(jnp.sum(loss,axis=2))
