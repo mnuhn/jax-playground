@@ -11,7 +11,7 @@ from visualizer import Visualizer
 class LSTM(nn.Module):
   predictions: int
   hidden_state_dim: int
-  dense_size: int
+  dense_sizes: list[int]
 
   def setup(self):
     pass
@@ -32,8 +32,10 @@ class LSTM(nn.Module):
 
     # Take only last hidden state.
     x = x[:,-1,:]
-    x = nn.Dense(features=self.dense_size)(x)
-    x = nn.sigmoid(x)
+
+    for i in range(0,len(self.dense_sizes)):
+      x = nn.Dense(features=self.dense_sizes[i])(x)
+      x = nn.sigmoid(x)
 
     x = nn.Dense(features=self.predictions)(x)
     x = nn.sigmoid(x)
@@ -49,8 +51,7 @@ class CNN(nn.Module):
   conv_channels: list[int]
   down_scale: int
   conv_len: int
-  dense_size: int
-  num_dense: int
+  dense_sizes: list[int]
   predictions: int
   features_per_prediction: int
   batch_norm: bool
@@ -116,9 +117,9 @@ class CNN(nn.Module):
       debug_output["conv_reshaped_with_nonconv_features"] = x
 
     # Dense layers.
-    for i in range(0,self.num_dense):
+    for i in range(0,len(self.dense_sizes)):
       name = f'dense_{i}'
-      x = nn.Dense(features=self.dense_size, kernel_init=initializers.glorot_uniform())(x)
+      x = nn.Dense(features=self.dense_sizes[i], kernel_init=initializers.glorot_uniform())(x)
 
       debug_output[f"{name}_act"] = x
 

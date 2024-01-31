@@ -33,9 +33,8 @@ p.add_argument('--tensorboard', type=bool, default=False)
 p.add_argument('--draw', type=bool, default=False)
 p.add_argument('--png', type=bool, default=False)
 p.add_argument('--dropout', type=float, default=0.0)
-p.add_argument('--num_dense', type=int, default=1)
+p.add_argument('--dense_sizes', type=str, default="100")
 p.add_argument('--padding', type=str, default='VALID')
-p.add_argument('--dense_size', type=int, default=100)
 p.add_argument('--learning_rate', type=float, default=0.001)
 p.add_argument('--epochs', type=float, default=10)
 p.add_argument('--data', type=str)
@@ -74,9 +73,24 @@ predict_len = Y.shape[1]
 predict_feature_cnt = Y.shape[2]
 
 conv_channels = [ int(x) for x in p.conv_channels.split(",") ]
+dense_sizes = [ int(x) for x in p.dense_sizes.split(",") ]
 
 if p.log_dir == None:
-  p.log_dir = f'./tensorboard/{p.prefix}lossfac{p.loss_fac}-historylen{history_len}-historyfeaturecnt{history_feature_cnt}-predictlen{predict_len}-predictfeaturecnt{predict_feature_cnt}model{p.model}-convlen{len(conv_channels)}-dscale{p.down_scale}-padding{p.padding}-densesize{p.dense_size}-numdense{p.num_dense}-lr{p.learning_rate}-bs{p.batch_size}'
+  p.log_dir = (
+          './tensorboard/'
+          f'{p.prefix}lossfac{p.loss_fac}-'
+          f'historylen{history_len}-'
+          f'historyfeaturecnt{history_feature_cnt}-'
+          f'predictlen{predict_len}-'
+          f'predictfeaturecnt{predict_feature_cnt}-'
+          f'model{p.model}-'
+          f'convchannels{"-".join([str(x) for x in conv_channels])}-'
+          f'dscale{p.down_scale}-'
+          f'padding{p.padding}-'
+          f'densesizes{"-".join([str(x) for x in dense_sizes])}-'
+          f'lr{p.learning_rate}-'
+          f'bs{p.batch_size}'
+          )
 
 print("Logging to", p.log_dir)
 
@@ -90,8 +104,7 @@ if p.model == "cnn":
   m = model.CNN(
           conv_channels=conv_channels,
           conv_len=p.conv_len,
-          dense_size=p.dense_size,
-          num_dense=p.num_dense,
+          dense_sizes=dense_sizes,
           down_scale=p.down_scale,
           predictions=predictions,
           features_per_prediction=predict_feature_cnt,
@@ -103,7 +116,7 @@ if p.model == "cnn":
 elif p.model == "lstm":
   m = model.LSTM(
           hidden_state_dim=p.channels,
-          dense_size=p.dense_size,
+          dense_sizes=dense_sizes,
           predictions=predictions,
           )
 
@@ -241,13 +254,12 @@ if summary_writer:
       'history_len': int(history_len),
       'predict_len': int(predict_len),
       'batch_norm': bool(p.batch_norm),
-      'num_dense': int(p.num_dense),
-      'dense_size': int(p.dense_size),
+      'dense_size': str(dense_sizes),
+      'conv_channels': str(conv_channels),
       'learning_rate': p.learning_rate,
       'down_scale': int(p.down_scale),
       'conv_len': int(p.conv_len),
       # ADD conv channels
-      'num_convs': int(len(conv_channels)),
       'model': p.model,
       })
 
