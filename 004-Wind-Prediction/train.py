@@ -208,16 +208,16 @@ def train_step(state: TrainState, x, y):
 #@jax.jit
 def eval_step(state: TrainState, x, y):
   if p.batch_norm:
-    preds = state.apply_fn({'params': state.params, 'batch_stats': state.batch_stats}, x=x, train=False)
+    preds, debug = state.apply_fn({'params': state.params, 'batch_stats': state.batch_stats}, x=x, train=False, debug=True)
   else:
-    preds = state.apply_fn({'params': state.params}, x=x, train=False)
+    preds, debug = state.apply_fn({'params': state.params}, x=x, train=False, debug=True)
 
   #jax.debug.print("batch_stats={batch_stats}", batch_stats=state.batch_stats)
-  jax.debug.print("x={x}", x=x)
-  jax.debug.print("preds={preds}", preds=preds)
-  jax.debug.print("y={y}", y=y)
-  loss = jnp.mean((preds-y)**2)
-  return state, loss
+  #jax.debug.print("x={x}", x=x)
+  #jax.debug.print("preds={preds}", preds=preds)
+  #jax.debug.print("y={y}", y=y)
+  loss = jnp.mean((preds[:,:,0]-y[:,:,0])**2)
+  return state, loss, debug
 
 examples = X.shape[0]
 iters = int(p.epochs * (examples / p.batch_size))
@@ -268,11 +268,14 @@ for i in pbar:
         print(k, l, np.mean(grads[k][l]))
 
     if p.draw:
+      images = []
       for j in range(0,10):
-        v = Visualizer(1200,1600)
+        v = Visualizer()
         debug["truth"] = YT
         v.draw_dict(debug, num=j)
         v.save(f"./png/{p.prefix}-test{i:05d}-{j:03d}.png")
+        image = tf.image.decode_png(v.byte_array(), channels=4)
+        images.append(image)
         del v
       if summary_writer:
         summary_writer.image('activations', images, step=i)
