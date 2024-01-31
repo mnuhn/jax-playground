@@ -73,8 +73,10 @@ history_feature_cnt = X.shape[2]
 predict_len = Y.shape[1]
 predict_feature_cnt = Y.shape[2]
 
+conv_channels = [ int(x) for x in p.conv_channels.split(",") ]
+
 if p.log_dir == None:
-  p.log_dir = f'./tensorboard/{p.prefix}lossfac{p.loss_fac}-historylen{history_len}-historyfeaturecnt{history_feature_cnt}-predictlen{predict_len}-predictfeaturecnt{predict_feature_cnt}model{p.model}-convlen{len(conv_channels)}-dscale{p.down_scale}-chans{p.conv_channels}-padding{p.padding}-densesize{p.dense_size}-numdense{p.num_dense}-lr{p.learning_rate}-bs{p.batch_size}'
+  p.log_dir = f'./tensorboard/{p.prefix}lossfac{p.loss_fac}-historylen{history_len}-historyfeaturecnt{history_feature_cnt}-predictlen{predict_len}-predictfeaturecnt{predict_feature_cnt}model{p.model}-convlen{len(conv_channels)}-dscale{p.down_scale}-padding{p.padding}-densesize{p.dense_size}-numdense{p.num_dense}-lr{p.learning_rate}-bs{p.batch_size}'
 
 print("Logging to", p.log_dir)
 
@@ -82,7 +84,6 @@ if os.path.exists(p.log_dir):
   print("Logging dir already exists. Stopping")
   sys.exit(1)
 
-conv_channels = [ int(x) for x in p.conv_channels.split(",") ]
 
 m = None
 if p.model == "cnn":
