@@ -12,6 +12,8 @@ import optax
 import flax
 import os
 import sys
+import jaxopt
+import tensorflow as tf
 from flax.training import train_state
 from flax.metrics import tensorboard
 from visualizer import Visualizer
@@ -28,6 +30,7 @@ p.add_argument('--conv_len', type=int, default=8)
 p.add_argument('--nonconv_features', type=int, default=0)
 p.add_argument('--down_scale', type=int, default=2)
 p.add_argument('--batch_norm', type=bool, default=False)
+p.add_argument('--tensorboard', type=bool, default=False)
 p.add_argument('--draw', type=bool, default=False)
 p.add_argument('--dropout', type=float, default=0.0)
 p.add_argument('--num_dense', type=int, default=1)
@@ -137,7 +140,12 @@ else:
 
 #opt_state = tx.init(params)
 
-summary_writer = tensorboard.SummaryWriter(p.log_dir)
+summary_writer = None
+
+if p.tensorboard:
+  summary_writer = tensorboard.SummaryWriter(p.log_dir)
+else:
+  summary_writer = None
 
 class TrainState(train_state.TrainState):
   batch_stats: any
@@ -224,21 +232,22 @@ every_iters = int(iters / 100.0 * p.debug_every_percent)
 debug_str = params_debug_str()
 eval_loss = 0.0
 
-summary_writer.hparams(hparams = {
-    'batch_size': int(p.batch_size),
-    'history_feature_cnt': int(history_feature_cnt),
-    'history_len': int(history_len),
-    'predict_len': int(predict_len),
-    'batch_norm': bool(p.batch_norm),
-    'num_dense': int(p.num_dense),
-    'dense_size': int(p.dense_size),
-    'learning_rate': p.learning_rate,
-    'down_scale': int(p.down_scale),
-    'conv_len': int(p.conv_len),
-    # ADD conv channels
-    'num_convs': int(len(conv_channels)),
-    'model': p.model,
-    })
+if summary_writer:
+  summary_writer.hparams(hparams = {
+      'batch_size': int(p.batch_size),
+      'history_feature_cnt': int(history_feature_cnt),
+      'history_len': int(history_len),
+      'predict_len': int(predict_len),
+      'batch_norm': bool(p.batch_norm),
+      'num_dense': int(p.num_dense),
+      'dense_size': int(p.dense_size),
+      'learning_rate': p.learning_rate,
+      'down_scale': int(p.down_scale),
+      'conv_len': int(p.conv_len),
+      # ADD conv channels
+      'num_convs': int(len(conv_channels)),
+      'model': p.model,
+      })
 
 for i in pbar:
   if i > iters:
@@ -252,7 +261,8 @@ for i in pbar:
   if i % every_iters == 0:
     _, eval_loss, debug = eval_step(state, XT, YT)
     eval_loss = eval_loss ** 0.5
-    summary_writer.scalar('eval_loss', eval_loss, i)
+    if summary_writer:
+      summary_writer.scalar('eval_loss', eval_loss, i)
     for k in grads.keys():
       for l in grads[k]:
         print(k, l, np.mean(grads[k][l]))
@@ -264,14 +274,20 @@ for i in pbar:
         v.draw_dict(debug, num=j)
         v.save(f"./png/{p.prefix}-test{i:05d}-{j:03d}.png")
         del v
+      if summary_writer:
+        summary_writer.image('activations', images, step=i)
+        summary_writer.flush()
+
 
     #jax.debug.print("kernel_shape={x}",x=state.params['Conv_0']['kernel'].shape)
     #jax.debug.print("kernel={x}",x=jnp.transpose(state.params['Conv_0']['kernel'],axes=[2,1,0]))
 
-  summary_writer.scalar('train_loss', train_loss, i)
+  if summary_writer:
+    summary_writer.scalar('train_loss', train_loss, i)
   pbar.set_description(f"train_loss={train_loss:.06f} eval_loss={eval_loss:.06f}")
-  #summary_writer.scalar('train_loss', 0.3, 2.0)
-summary_writer.flush()
+
+if summary_writer:
+  summary_writer.flush()
 
 #if p.model_name:
 #  with open(p.model_name, "wb") as store:
