@@ -102,6 +102,8 @@ class CNN(nn.Module):
 
       x = nn.max_pool(x, window_shape=(self.down_scale,), strides=(self.down_scale,))
 
+      assert x.shape[1] >= 1, f"max_pooling layer yielded size {x.shape[1]}"
+
       if debug:
         debug_output[f"{name}_pooled"] = x
 
