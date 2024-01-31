@@ -94,7 +94,7 @@ class CNN(nn.Module):
       if self.dropout > 0.0:
         x = nn.Dropout(rate=self.dropout, deterministic=not train)(x)
 
-      x = nn.relu(x)
+      x = nn.leaky_relu(x)
 
       if debug:
         debug_output[f"{name}_relu"] = x
