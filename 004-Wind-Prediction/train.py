@@ -74,7 +74,7 @@ predict_len = Y.shape[1]
 predict_feature_cnt = Y.shape[2]
 
 if p.log_dir == None:
-  p.log_dir = f'./tensorboard/{p.prefix}lossfac{p.loss_fac}-historylen{history_len}-historyfeaturecnt{history_feature_cnt}-predictlen{predict_len}-predictfeaturecnt{predict_feature_cnt}model{p.model}-convs{p.num_convs}-convlen{p.conv_len}-dscale{p.down_scale}-chans{p.channels}-padding{p.padding}-densesize{p.dense_size}-numdense{p.num_dense}-lr{p.learning_rate}-bs{p.batch_size}'
+  p.log_dir = f'./tensorboard/{p.prefix}lossfac{p.loss_fac}-historylen{history_len}-historyfeaturecnt{history_feature_cnt}-predictlen{predict_len}-predictfeaturecnt{predict_feature_cnt}model{p.model}-convs{p.num_convs}-convlen{p.conv_len}-dscale{p.down_scale}-chans{p.conv_channels}-padding{p.padding}-densesize{p.dense_size}-numdense{p.num_dense}-lr{p.learning_rate}-bs{p.batch_size}'
 
 print("Logging to", p.log_dir)
 
