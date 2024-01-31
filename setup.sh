@@ -1,1 +1,1 @@
-source jax-playground/bin/activate
+source venv/bin/activate
