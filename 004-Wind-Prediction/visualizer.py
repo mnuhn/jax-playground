@@ -33,13 +33,10 @@ class Visualizer():
     x_max = 0
     y_max = 0
 
-    print("=========")
-
     font = ImageFont.load_default()
     for k in debug.keys():
       if k == "conv_reshaped" or k == "conv_reshaped_with_nonconv_features":
         continue
-      print("x0 y0", x0, y0)
       to_draw = debug[k][num]
       if len(to_draw.shape) == 1:
         to_draw = np.expand_dims(to_draw, axis=1)
@@ -50,11 +47,8 @@ class Visualizer():
         print("error with", to_draw)
         continue
 
-      print(f"k {k}")
       to_draw = scale(to_draw)
-      print("to draw", to_draw.shape)
       x1, y1 = self.box(to_draw, x0, y0)
-      print("after box: x1 y1", x1, y1)
 
       self.id.text((x1 + self.box_width, y0), k, font = font, fill=(255, 255, 255, 128))
       text_box = font.getbbox(k)
@@ -62,12 +56,8 @@ class Visualizer():
       x1 = x1 + 2*self.box_width + text_box[2]
       y1 = max(y0 + text_box[3] + self.box_width, y1)
 
-      print("x1 y1", x1, y1)
-
       x_max = max(x_max, x1)
       y_max = max(y_max, y1)
-
-      print("x_max y_max", x_max, y_max)
 
       if k.startswith("conv_") and (k.endswith("conv") or k.endswith("relu")): # TODO or k == "input_conv":
         x0 = x1 + self.box_width
@@ -75,7 +65,6 @@ class Visualizer():
         x0 = 0
         y0 = y1 + self.box_width
 
-    print("final x_max y_max", x_max, y_max)
     self.im = self.im.crop((0,0,x_max,y_max))
 
 
