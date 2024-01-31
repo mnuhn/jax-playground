@@ -4,9 +4,14 @@ Description of the project. Keywords: Dataset preparataion. Jax, Tensorboard,
 Visualization, CNNs, Debugging, Max-Pooling, Batchnorm (not), Regression.
 Evaluation of the features. Comparison of Model architectures.
 
-1) Picture of Wind data
-2) Feature preprocessing
-3) Image of activations
+
+Wind/Gust Speed|Wind Direction
+---|---
+![Wind](wind1.png) | ![Wind](wind2.png)
+
+Convolutional Neural Network for Prediction
+
+![Activations](activations.png)
 
 ## Overview
 * [Wind Data](#wind-data)
