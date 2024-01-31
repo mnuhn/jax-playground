@@ -74,13 +74,11 @@ class CNN(nn.Module):
       last_features = x[:,-1,-self.nonconv_features:]
       rest = x[:,:,:-self.nonconv_features]
 
-      if debug:
-        debug_output["last_features"] = last_features
-        debug_output["rest"] = rest
       x = rest
 
-    if debug:
-      debug_output["input_conv"] = x
+      if debug:
+        debug_output["input_conv"] = rest
+        debug_output["last_features"] = last_features
 
     # Convolutions.
     for i in range(0,len(self.conv_channels)):
