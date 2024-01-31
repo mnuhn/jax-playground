@@ -1,13 +1,19 @@
 # jax-playground
 
-## Setup
+## Installation
 
 ```
-python3 -m venv jax-playground
-source jax-playground/bin/activate
+bash install.sh
+```
 
-pip3 install --upgrade pip
-pip3 install jax jaxlib jupyter tqdm matplotlib flax
+## Using
 
+```
+bash setup.sh
+```
+
+and
+
+```
 jupyter notebook
 ```
