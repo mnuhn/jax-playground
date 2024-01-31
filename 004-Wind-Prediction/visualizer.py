@@ -41,10 +41,10 @@ class Visualizer():
       if len(to_draw.shape) == 1:
         to_draw = np.expand_dims(to_draw, axis=1)
       if to_draw.shape[0] == 0:
-        print("error with", to_draw)
+        print(f"{k}: error with {to_draw} due to shape")
         continue
       if to_draw.shape[1] == 0:
-        print("error with", to_draw)
+        print(f"{k}: error with {to_draw} due to shape")
         continue
 
       to_draw = scale(to_draw)

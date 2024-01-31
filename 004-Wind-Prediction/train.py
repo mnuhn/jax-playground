@@ -22,8 +22,8 @@ import data
 import model
 
 p = argparse.ArgumentParser(description='...')
-p.add_argument('--batch_size', type=int, default=16)
-p.add_argument('--conv_channels', type=str, default="20")
+p.add_argument('--batch_size', type=int, default=128)
+p.add_argument('--conv_channels', type=str, default="20,40")
 p.add_argument('--loss_fac', type=float, default=1.0)
 p.add_argument('--conv_len', type=int, default=8)
 p.add_argument('--nonconv_features', type=int, default=0)
@@ -97,7 +97,6 @@ print("Logging to", p.log_dir)
 if os.path.exists(p.log_dir):
   print("Logging dir already exists. Stopping")
   sys.exit(1)
-
 
 m = None
 if p.model == "cnn":
