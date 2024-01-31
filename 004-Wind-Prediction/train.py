@@ -31,6 +31,7 @@ p.add_argument('--down_scale', type=int, default=2)
 p.add_argument('--batch_norm', type=bool, default=False)
 p.add_argument('--tensorboard', type=bool, default=False)
 p.add_argument('--draw', type=bool, default=False)
+p.add_argument('--png', type=bool, default=False)
 p.add_argument('--dropout', type=float, default=0.0)
 p.add_argument('--num_dense', type=int, default=1)
 p.add_argument('--padding', type=str, default='VALID')
@@ -273,7 +274,8 @@ for i in pbar:
         v = Visualizer()
         debug["truth"] = YT
         v.draw_dict(debug, num=j)
-        v.save(f"./png/{p.prefix}-test{i:05d}-{j:03d}.png")
+        if p.png:
+          v.save(f"./png/{p.prefix}-test{i:05d}-{j:03d}.png")
         image = tf.image.decode_png(v.byte_array(), channels=4)
         images.append(image)
         del v
