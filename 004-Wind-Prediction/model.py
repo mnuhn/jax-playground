@@ -23,6 +23,10 @@ class LSTM(nn.Module):
 
   @nn.compact
   def __call__(self, x, train: bool, debug:bool = False):
+    debug_output = {}
+
+    if debug:
+      debug_output["input"] = x
 
     def lstm_layer(x, dim):
       cell = nn.OptimizedLSTMCell(dim)
@@ -41,21 +45,50 @@ class LSTM(nn.Module):
 
     if self.down_scale > 1:
       x = nn.max_pool(x, window_shape=(self.down_scale,), strides=(self.down_scale,))
+      if debug:
+        debug_output["input_downscaled"] = x
 
     for i, dim in enumerate(self.conv_channels):
       x = lstm_layer(x, dim)
+      if debug:
+        debug_output[f"lstm_{i}"] = x
+      if self.dropout > 0.0:
+        x = nn.Dropout(rate=self.dropout, deterministic=not train)(x)
 
     # Take only last hidden state.
     x = x[:,-1,:]
 
-    for i in range(0,len(self.dense_sizes)):
-      x = nn.Dense(features=self.dense_sizes[i])(x)
-      x = nn.sigmoid(x)
+    if debug:
+      debug_output[f"lstm_last_state"] = x
 
-    x = nn.Dense(features=self.predictions)(x)
+    for i in range(0,len(self.dense_sizes)):
+      name = f'dense_{i}'
+      debug_output[f"{name}_act"] = x
+
+      x = nn.Dense(features=self.dense_sizes[i])(x)
+
+      if self.dropout > 0.0:
+        x = nn.Dropout(rate=self.dropout, deterministic=not train)(x)
+
+      x = nn.relu(x)
+
+      if debug:
+        debug_output[f"{name}_relu"] = x
+
+    x = nn.Dense(features=self.predictions*self.features_per_prediction, kernel_init=initializers.glorot_uniform())(x)
+    x = x.reshape((-1, self.predictions, self.features_per_prediction))
+
+    if debug:
+      debug_output[f"final_act"] = x
+
     x = nn.sigmoid(x)
 
-    x = x.reshape((-1, self.predictions, self.features_per_prediction))
+    if debug:
+      debug_output["final"] = x
+
+
+    if debug:
+      return x, debug_output
 
     return x
 
@@ -156,10 +189,11 @@ class CNN(nn.Module):
 
     x = nn.Dense(features=self.predictions*self.features_per_prediction, kernel_init=initializers.glorot_uniform())(x)
     x = x.reshape((-1, self.predictions, self.features_per_prediction))
-    debug_output[f"final_act"] = x
+
+    if debug:
+      debug_output[f"final_act"] = x
 
     x = nn.sigmoid(x)
-    debug_output[f"final_sigmoid"] = x
 
     if debug:
       debug_output["final"] = x
