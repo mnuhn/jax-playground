@@ -1,68 +1,93 @@
-from helper import convolution
+import os
+
+# Force CPU
+#os.environ["JAX_PLATFORM_NAME"] = "cpu"
+
+from flax import metrics
+from flax.metrics import tensorboard
+from flax.training import train_state
 from jax import grad, jit, random
 from jax import lax
-from tqdm import tqdm
-from flax import metrics
-import argparse
+import flax
 import jax
 import jax.nn
 import jax.numpy as jnp
+import jaxopt
+import jax.tree_util
 import numpy as np
 import optax
-import flax
-import os
-import sys
-import jaxopt
 import tensorflow as tf
-from flax.training import train_state
-from flax.metrics import tensorboard
+
 from visualizer import Visualizer
+from helper import convolution
+from tqdm import tqdm
+import argparse
+import re
+import sys
 
 import data
 import model
 
 p = argparse.ArgumentParser(description='...')
-p.add_argument('--batch_size', type=int, default=128)
+
+# Logging.
+p.add_argument('--prefix', type=str, default="")
+p.add_argument('--log_dir', type=str, default=None)
+p.add_argument('--dry_run', type=bool, default=False)
+p.add_argument('--debug_every_percent', type=float, default=2.0)
+p.add_argument('--draw_every_percent', type=float, default=10.0)
+p.add_argument('--tensorboard', type=bool, default=False)
+p.add_argument('--png', type=bool, default=False)
+p.add_argument('--draw', type=bool, default=False)
+p.add_argument('--data', type=str)
+
+# Model params.
+p.add_argument('--model', type=str, default=None)
+p.add_argument('--down_scale', type=int, default=2)
+p.add_argument('--dense_sizes', type=str, default="100")
 p.add_argument('--conv_channels', type=str, default="20,40")
-p.add_argument('--loss_fac', type=float, default=1.0)
 p.add_argument('--conv_len', type=int, default=8)
 p.add_argument('--nonconv_features', type=int, default=0)
-p.add_argument('--down_scale', type=int, default=2)
-p.add_argument('--batch_norm', type=bool, default=False)
-p.add_argument('--tensorboard', type=bool, default=False)
-p.add_argument('--draw', type=bool, default=False)
-p.add_argument('--png', type=bool, default=False)
-p.add_argument('--dropout', type=float, default=0.0)
-p.add_argument('--dense_sizes', type=str, default="100")
 p.add_argument('--padding', type=str, default='SAME')
-p.add_argument('--learning_rate', type=float, default=0.001)
+
+# Training params.
+p.add_argument('--batch_size', type=int, default=256)
+p.add_argument('--lr', type=float, default=0.001)
+p.add_argument('--dropout', type=float, default=0.0)
+p.add_argument('--batch_norm', type=bool, default=False)
 p.add_argument('--epochs', type=float, default=10)
-p.add_argument('--data', type=str)
-p.add_argument('--debug_every_percent', type=int, default=1)
-p.add_argument('--model', type=str, default=None)
-p.add_argument('--prefix', type=str, default="")
+
+# Loss params.
+p.add_argument('--loss_fac', type=float, default=1.0)
+
+
 p.add_argument('--model_name', type=str, default=None)
-p.add_argument('--log_dir', type=str, default=None)
 p = p.parse_args()
 
-def params_debug_str():
-  debug_strs = []
+def params_debug_str(history_len, history_feature_cnt):
+  debug_strs = [f"histlen{history_len}", f"histfeats{history_feature_cnt}"]
   for arg in vars(p):
+    if arg == 'data' or arg == 'debug_every_percent' or arg == 'log_dir' or arg == 'model_name' or arg == 'dry_run' or arg == 'tensorboard':
+      continue
     value = getattr(p, arg)
-    debug_strs.append(f"{arg}={value}")
-  debug_str = " ".join(debug_strs)
+    value = re.sub(r'[,]+', '-', str(value))
+    debug_strs.append(f"{arg}{value}")
+  debug_str = "-".join(debug_strs)
   return debug_str
 
-with np.load(p.data) as data:
+print("Loading data from", p.data)
+
+with np.load(p.data, mmap_mode=None) as data:
   X = data['x_train']
   Y = data['y_train']
-  XT = data['x_test']
-  YT = data['y_test']
 
   if len(Y.shape) < 3:
     # Ensure 1 separate dimension for the to-be-predicted features.
     YT = np.expand_dims(YT, 2)
     Y = np.expand_dims(Y, 2)
+
+  XT = data['x_test'][:5000,:,:]
+  YT = data['y_test'][:5000,:,:]
 
   history = X.shape[1]
   predictions = Y.shape[1]
@@ -72,31 +97,30 @@ history_feature_cnt = X.shape[2]
 predict_len = Y.shape[1]
 predict_feature_cnt = Y.shape[2]
 
-conv_channels = [ int(x) for x in p.conv_channels.split(",") ]
+print("Loading data from", p.data, "done")
+
+if p.conv_channels == 'None':
+  conv_channels = []
+else:
+  conv_channels = [ int(x) for x in p.conv_channels.split(",") ]
+
 dense_sizes = [ int(x) for x in p.dense_sizes.split(",") ]
 
 if p.log_dir == None:
-  p.log_dir = (
-          './tensorboard/'
-          f'{p.prefix}lossfac{p.loss_fac}-'
-          f'historylen{history_len}-'
-          f'historyfeaturecnt{history_feature_cnt}-'
-          f'predictlen{predict_len}-'
-          f'predictfeaturecnt{predict_feature_cnt}-'
-          f'model{p.model}-'
-          f'convchannels{"-".join([str(x) for x in conv_channels])}-'
-          f'dscale{p.down_scale}-'
-          f'padding{p.padding}-'
-          f'densesizes{"-".join([str(x) for x in dense_sizes])}-'
-          f'lr{p.learning_rate}-'
-          f'bs{p.batch_size}'
-          )
+  debug_str = params_debug_str(history_len, history_feature_cnt)
+  p.log_dir = f'tb/{debug_str}'
 
 print("Logging to", p.log_dir)
 
 if os.path.exists(p.log_dir):
   print("Logging dir already exists. Stopping")
   sys.exit(1)
+
+if p.dry_run:
+  print("Dry run. Stopping.")
+  sys.exit(1)
+
+print('JAX devices:', jax.devices())
 
 m = None
 if p.model == "cnn":
@@ -114,9 +138,14 @@ if p.model == "cnn":
           )
 elif p.model == "lstm":
   m = model.LSTM(
-          hidden_state_dim=p.channels,
+          conv_channels=conv_channels,
           dense_sizes=dense_sizes,
           predictions=predictions,
+          features_per_prediction=predict_feature_cnt,
+          down_scale=p.down_scale,
+          dropout=p.dropout,
+          nonconv_features=p.nonconv_features,
+          batch_norm=p.batch_norm,
           )
 
 assert m
@@ -124,10 +153,8 @@ assert m
 def getbatch(X,Y,batch_size):
   while True:
     perm = np.random.permutation(X.shape[0])
-    print("permute")
     X = X[perm]
     Y = Y[perm]
-    print("permute_done")
     for i in range(0, int(len(X)/batch_size)):
       yield X[i*batch_size:(i+1)*batch_size,:], Y[i*batch_size:(i+1)*batch_size]
 
@@ -144,15 +171,6 @@ if p.batch_norm:
 else:
   batch_stats = None
 
-#for layer_params in params["params"].items():
-#  print(f"Layer {layer_params[0]}")
-#  for k, v in layer_params[1].items():
-#    print(f"  Param {k} ({v.shape})")
-
-#value_and_grad = jit(jax.value_and_grad(m.loss_training))
-
-#opt_state = tx.init(params)
-
 summary_writer = None
 
 if p.tensorboard:
@@ -167,7 +185,7 @@ state = TrainState.create(
   apply_fn = m.apply,
   params = params,
   batch_stats = batch_stats,
-  tx = optax.adam(learning_rate=p.learning_rate)
+  tx = optax.adam(learning_rate=p.lr)
 )
 
 def scaled_loss(preds, y, non_first_fac):
@@ -206,9 +224,6 @@ def train_step(state: TrainState, x, y):
       loss = scaled_loss(preds, y, p.loss_fac)
       return loss, (preds,)
 
-    #jax.debug.print("params={params}", params=params['Dense_1']['kernel'])
-    #jax.debug.print("preds={preds}", preds=preds)
-
   grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
   if p.batch_norm:
     (cur_train_loss, (preds, updates)), grads = grad_fn(state.params)
@@ -226,10 +241,6 @@ def eval_step(state: TrainState, x, y):
   else:
     preds, debug = state.apply_fn({'params': state.params}, x=x, train=False, debug=True)
 
-  #jax.debug.print("batch_stats={batch_stats}", batch_stats=state.batch_stats)
-  #jax.debug.print("x={x}", x=x)
-  #jax.debug.print("preds={preds}", preds=preds)
-  #jax.debug.print("y={y}", y=y)
   loss = jnp.mean((preds[:,:,0]-y[:,:,0])**2)
   return state, loss, debug
 
@@ -242,8 +253,8 @@ print(f"to run {p.epochs} epochs need to run {iters}.")
 pbar = tqdm(range(int(iters)))
 
 every_iters = int(iters / 100.0 * p.debug_every_percent)
+draw_every_iters = int(iters / 100.0 * p.draw_every_percent)
 
-debug_str = params_debug_str()
 eval_loss = 0.0
 
 if summary_writer:
@@ -255,52 +266,51 @@ if summary_writer:
       'batch_norm': bool(p.batch_norm),
       'dense_size': str(dense_sizes),
       'conv_channels': str(conv_channels),
-      'learning_rate': p.learning_rate,
+      'learning_rate': p.lr,
       'down_scale': int(p.down_scale),
+      'dropout': float(p.dropout),
       'conv_len': int(p.conv_len),
-      # ADD conv channels
       'model': p.model,
       })
 
-for i in pbar:
-  if i > iters:
+for step in pbar:
+  if step > iters:
     break
   (x, y) = next(batcher)
-  #print("Train Step")
-  #print(state.batch_stats)
   state, train_loss, grads = train_step(state, x, y)
   train_loss = train_loss ** 0.5
 
-  if i % every_iters == 0:
-    _, eval_loss, debug = eval_step(state, XT, YT)
+  if step > 0 and step % every_iters == 0:
+    _, eval_loss, acts = eval_step(state, XT, YT)
     eval_loss = eval_loss ** 0.5
     if summary_writer:
-      summary_writer.scalar('eval_loss', eval_loss, i)
-    for k in grads.keys():
-      for l in grads[k]:
-        print(k, l, np.mean(grads[k][l]))
+      summary_writer.scalar('eval_loss', eval_loss, step)
 
-    if p.draw:
+      grads_flat, _ = jax.tree_util.tree_flatten_with_path(grads)
+      for key_path, value in grads_flat:
+        summary_writer.histogram(f"Gradient{jax.tree_util.keystr(key_path)}",  value, step)
+
+      acts_flat, _ = jax.tree_util.tree_flatten_with_path(acts)
+      for key_path, value in acts_flat:
+        summary_writer.histogram(f"Activation{jax.tree_util.keystr(key_path)}",  value, step)
+
+    if step > 0 and p.draw and step % draw_every_iters == 0:
       images = []
       for j in range(0,10):
         v = Visualizer()
-        debug["truth"] = YT
-        v.draw_dict(debug, num=j)
+        acts["truth"] = YT
+        v.draw_dict(acts, num=j)
         if p.png:
           v.save(f"./png/{p.prefix}-test{i:05d}-{j:03d}.png")
         image = tf.image.decode_png(v.byte_array(), channels=4)
         images.append(image)
         del v
       if summary_writer:
-        summary_writer.image('activations', images, step=i)
+        summary_writer.image('acts', images, step=step)
         summary_writer.flush()
 
-
-    #jax.debug.print("kernel_shape={x}",x=state.params['Conv_0']['kernel'].shape)
-    #jax.debug.print("kernel={x}",x=jnp.transpose(state.params['Conv_0']['kernel'],axes=[2,1,0]))
-
   if summary_writer:
-    summary_writer.scalar('train_loss', train_loss, i)
+    summary_writer.scalar('train_loss', train_loss, step)
   pbar.set_description(f"train_loss={train_loss:.06f} eval_loss={eval_loss:.06f}")
 
 if summary_writer:
