@@ -10,7 +10,7 @@ from visualizer import Visualizer
 
 class LSTM(nn.Module):
   predictions: int
-  hidden_state_dim: int
+  conv_channels: list[int]
   dense_sizes: list[int]
 
   def setup(self):
@@ -92,15 +92,15 @@ class CNN(nn.Module):
       if self.batch_norm:
         x = nn.BatchNorm(use_running_average=not train)(x)
 
-      if self.dropout > 0.0:
-        x = nn.Dropout(rate=self.dropout, deterministic=not train)(x)
-
       x = nn.leaky_relu(x)
 
       if debug:
         debug_output[f"{name}_relu"] = x
 
       x = nn.max_pool(x, window_shape=(self.down_scale,), strides=(self.down_scale,))
+
+      if self.dropout > 0.0:
+        x = nn.Dropout(rate=self.dropout, deterministic=not train)(x)
 
       assert x.shape[1] >= 1, f"max_pooling layer yielded size {x.shape[1]}"
 
@@ -138,10 +138,10 @@ class CNN(nn.Module):
 
     x = nn.Dense(features=self.predictions*self.features_per_prediction, kernel_init=initializers.glorot_uniform())(x)
     x = x.reshape((-1, self.predictions, self.features_per_prediction))
-    debug_output[f"{name}_final_act"] = x
+    debug_output[f"final_act"] = x
 
     x = nn.sigmoid(x)
-    debug_output[f"{name}_final_sigmoid"] = x
+    debug_output[f"final_sigmoid"] = x
 
     if debug:
       debug_output["final"] = x
