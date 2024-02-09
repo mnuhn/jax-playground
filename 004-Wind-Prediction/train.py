@@ -26,7 +26,8 @@ import re
 import sys
 
 import data
-import model
+import lstm
+import cnn
 
 p = argparse.ArgumentParser(description='...')
 
@@ -123,7 +124,7 @@ print('JAX devices:', jax.devices())
 
 m = None
 if p.model == "cnn":
-  m = model.CNN(
+  m = cnn.CNN(
           conv_channels=conv_channels,
           conv_len=p.conv_len,
           dense_sizes=dense_sizes,
@@ -136,7 +137,7 @@ if p.model == "cnn":
           nonconv_features=p.nonconv_features,
           )
 elif p.model == "lstm":
-  m = model.LSTM(
+  m = lstm.LSTM(
           conv_channels=conv_channels,
           dense_sizes=dense_sizes,
           predictions=predictions,
