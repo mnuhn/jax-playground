@@ -12,23 +12,35 @@ class LSTM(nn.Module):
   predictions: int
   conv_channels: list[int]
   dense_sizes: list[int]
+  features_per_prediction: int
+  down_scale: int
+  dropout: float
+  nonconv_features: int
+  batch_norm: bool
 
   def setup(self):
     pass
 
   @nn.compact
-  def __call__(self, x):
-    cell = nn.OptimizedLSTMCell(self.hidden_state_dim)
-    def body_fn(cell, carry, x):
-      return cell(carry, x)
-    scan = nn.scan(
-      body_fn, variable_broadcast="params",
-      split_rngs={"params": False}, in_axes=1, out_axes=1)
+  def __call__(self, x, train: bool, debug:bool = False):
 
-    input_shape =  x[:, 0, :].shape
-    carry = cell.initialize_carry(
-      jax.random.key(0), input_shape)
-    carry, x = scan(cell, carry, x)
+    def lstm_layer(x, dim):
+      cell = nn.OptimizedLSTMCell(dim)
+      def body_fn(cell, carry, x):
+        return cell(carry, x)
+      scan = nn.scan(
+        body_fn, variable_broadcast="params",
+        split_rngs={"params": False}, in_axes=1, out_axes=1)
+
+      input_shape =  x[:, 0, :].shape
+      carry = cell.initialize_carry(
+        jax.random.key(0), input_shape)
+      carry, x = scan(cell, carry, x)
+
+      return x
+
+    for i, dim in enumerate(self.conv_channels):
+      x = lstm_layer(x, dim)
 
     # Take only last hidden state.
     x = x[:,-1,:]
@@ -39,6 +51,9 @@ class LSTM(nn.Module):
 
     x = nn.Dense(features=self.predictions)(x)
     x = nn.sigmoid(x)
+
+    x = x.reshape((-1, self.predictions, self.features_per_prediction))
+
     return x
 
   def loss(self, params, x, y):
