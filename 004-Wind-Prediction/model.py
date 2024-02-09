@@ -15,7 +15,7 @@ class LSTM(nn.Module):
   features_per_prediction: int
   down_scale: int
   dropout: float
-  nonconv_features: int
+  nonlstm_features: int
   batch_norm: bool
 
   def setup(self):
@@ -27,6 +27,16 @@ class LSTM(nn.Module):
 
     if debug:
       debug_output["input"] = x
+
+    if self.nonlstm_features > 0:
+      last_features = x[:,-1,-self.nonlstm_features:]
+      rest = x[:,:,:-self.nonlstm_features]
+
+      x = rest
+
+      if debug:
+        debug_output["input_lstm"] = rest
+        debug_output["last_features"] = last_features
 
     def lstm_layer(x, dim):
       cell = nn.OptimizedLSTMCell(dim)
@@ -60,6 +70,17 @@ class LSTM(nn.Module):
 
     if debug:
       debug_output[f"lstm_last_state"] = x
+
+    x = x.reshape((x.shape[0], -1))  # flatten
+
+    if debug:
+      debug_output["lstm_reshaped"] = x
+
+    if self.nonlstm_features > 0:
+      x = jnp.concatenate([x, last_features], axis=1)
+
+    if debug:
+      debug_output["lstm_reshaped_with_nonlstm_features"] = x
 
     for i in range(0,len(self.dense_sizes)):
       name = f'dense_{i}'

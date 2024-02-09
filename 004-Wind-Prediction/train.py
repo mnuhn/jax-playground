@@ -60,7 +60,6 @@ p.add_argument('--epochs', type=float, default=10)
 # Loss params.
 p.add_argument('--loss_fac', type=float, default=1.0)
 
-
 p.add_argument('--model_name', type=str, default=None)
 p = p.parse_args()
 
@@ -144,7 +143,7 @@ elif p.model == "lstm":
           features_per_prediction=predict_feature_cnt,
           down_scale=p.down_scale,
           dropout=p.dropout,
-          nonconv_features=p.nonconv_features,
+          nonlstm_features=p.nonconv_features,
           batch_norm=p.batch_norm,
           )
 
@@ -288,11 +287,11 @@ for step in pbar:
 
       grads_flat, _ = jax.tree_util.tree_flatten_with_path(grads)
       for key_path, value in grads_flat:
-        summary_writer.histogram(f"Gradient{jax.tree_util.keystr(key_path)}",  value, step)
+        summary_writer.histogram(f"zzz-debug:Gradient{jax.tree_util.keystr(key_path)}",  value, step)
 
       acts_flat, _ = jax.tree_util.tree_flatten_with_path(acts)
       for key_path, value in acts_flat:
-        summary_writer.histogram(f"Activation{jax.tree_util.keystr(key_path)}",  value, step)
+        summary_writer.histogram(f"zzz-debug:Activation{jax.tree_util.keystr(key_path)}",  value, step)
 
     if step > 0 and p.draw and step % draw_every_iters == 0:
       images = []
@@ -306,7 +305,7 @@ for step in pbar:
         images.append(image)
         del v
       if summary_writer:
-        summary_writer.image('acts', images, step=step)
+        summary_writer.image('zzz-debug:Activations', images, step=step)
         summary_writer.flush()
 
   if summary_writer:
