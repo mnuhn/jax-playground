@@ -44,6 +44,8 @@ p.add_argument('--data', type=str)
 
 # Model params.
 p.add_argument('--model', type=str, default=None)
+p.add_argument('--model_arch', type=str, default=None)
+
 p.add_argument('--down_scale', type=int, default=2)
 p.add_argument('--dense_sizes', type=str, default="100")
 p.add_argument('--conv_channels', type=str, default="20,40")
@@ -66,8 +68,10 @@ p = p.parse_args()
 
 def params_debug_str(history_len, history_feature_cnt):
   debug_strs = [f"histlen{history_len}", f"histfeats{history_feature_cnt}"]
+  skip = ['data', 'debug_every_percent', 'log_dir', 'model_name', 'dry_run', 'tensorboard', 'model_arch']
+
   for arg in vars(p):
-    if arg == 'data' or arg == 'debug_every_percent' or arg == 'log_dir' or arg == 'model_name' or arg == 'dry_run' or arg == 'tensorboard':
+    if arg in skip:
       continue
     value = getattr(p, arg)
     value = re.sub(r'[,]+', '-', str(value))
@@ -137,12 +141,12 @@ if p.model == "cnn":
           nonconv_features=p.nonconv_features,
           )
 elif p.model == "lstm":
+  m_desc = lstm.ModelDescription(p.model_arch)
   m = lstm.LSTM(
-          conv_channels=conv_channels,
+          model_desc=m_desc,
           dense_sizes=dense_sizes,
           predictions=predictions,
           features_per_prediction=predict_feature_cnt,
-          down_scale=p.down_scale,
           dropout=p.dropout,
           nonlstm_features=p.nonconv_features,
           batch_norm=p.batch_norm,
@@ -252,8 +256,8 @@ print(f"to run {p.epochs} epochs need to run {iters}.")
 
 pbar = tqdm(range(int(iters)))
 
-every_iters = int(iters / 100.0 * p.debug_every_percent)
-draw_every_iters = int(iters / 100.0 * p.draw_every_percent)
+every_iters = int(iters / 100.0) * p.debug_every_percent
+draw_every_iters = int(iters / 100.0) * p.draw_every_percent
 
 eval_loss = 0.0
 

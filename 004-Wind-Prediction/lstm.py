@@ -8,12 +8,46 @@ from flax import traverse_util
 from jax import tree_util
 from visualizer import Visualizer
 
+# Model descriptor looks like this:
+# HistoryA:dimA0,dimA1,...;HistoryB:dimB0,dimB1,...
+# model_description = "128:10,10;64:5,5"
+
+class LstmDescription:
+  history: int
+  downsample: int
+  layer_dims: list[int]
+
+  def __init__(self, s):
+    history_downsample_str, layer_description_str = s.split(":")
+    history_str, downsample_str = history_downsample_str.split(",")
+    self.history = int(history_str)
+    self.downsample = int(downsample_str)
+    layer_dims = layer_description_str.split(",")
+    self.layer_dims = [ int(x) for x in layer_dims ]
+
+  def __str__(self):
+    return f"LSTM \u007b History: {self.history} Dims: {self.layer_dims} \u007d"
+
+class ModelDescription:
+  lstms: list[LstmDescription]
+
+  def __init__(self, s):
+    self.lstms = []
+
+    for lstm_description_str in s.split(";"):
+      lstm = LstmDescription(lstm_description_str)
+      self.lstms.append(lstm)
+
+  def __str__(self):
+    inner = " ".join([ str(l) for l in self.lstms])
+    result = "Model { " + inner + " }"
+    return result
+
 class LSTM(nn.Module):
   predictions: int
-  conv_channels: list[int]
+  model_desc: ModelDescription
   dense_sizes: list[int]
   features_per_prediction: int
-  down_scale: int
   dropout: float
   nonlstm_features: int
   batch_norm: bool
@@ -53,34 +87,45 @@ class LSTM(nn.Module):
 
       return x
 
-    if self.down_scale > 1:
-      x = nn.max_pool(x, window_shape=(self.down_scale,), strides=(self.down_scale,))
-      if debug:
-        debug_output["input_downscaled"] = x
+    lstm_outs = []
 
-    for i, dim in enumerate(self.conv_channels):
-      x = lstm_layer(x, dim)
-      if debug:
-        debug_output[f"lstm_{i}"] = x
-      if self.dropout > 0.0:
-        x = nn.Dropout(rate=self.dropout, deterministic=not train)(x)
+    for i, lstm in enumerate(self.model_desc.lstms):
+      cur_lstm_x = x[:, -lstm.history:, :]
 
-    # Take only last hidden state.
-    x = x[:,-1,:]
+      if debug:
+        debug_output[f"lstm_{i}_in"] = cur_lstm_x
+
+      if lstm.downsample > 1:
+        cur_lstm_x = nn.max_pool(cur_lstm_x, window_shape=(lstm.downsample,), strides=(lstm.downsample,))
+        if debug:
+          debug_output[f"lstm_{i}_downsampled"] = cur_lstm_x
+
+      for j, dim in enumerate(lstm.layer_dims):
+        print(i, j, dim)
+        cur_lstm_x = lstm_layer(cur_lstm_x, dim)
+        if debug:
+          debug_output[f"lstm_{i}_{j}"] = cur_lstm_x
+        if self.dropout > 0.0:
+          cur_lstm_x = nn.Dropout(rate=self.dropout, deterministic=not train)(cur_lstm_x)
+      
+      cur_lstm_out = cur_lstm_x[:, -1, :]
+      cur_lstm_out = cur_lstm_out.reshape((x.shape[0], -1))  # flatten
+
+      if debug:
+        debug_output[f"lstm_{i}_last_state"] = cur_lstm_out
+
+      lstm_outs.append(cur_lstm_out)
+
+    x = jnp.concatenate(lstm_outs, axis=1)
 
     if debug:
-      debug_output[f"lstm_last_state"] = x
-
-    x = x.reshape((x.shape[0], -1))  # flatten
-
-    if debug:
-      debug_output["lstm_reshaped"] = x
+      debug_output["lstms_concat"] = x
 
     if self.nonlstm_features > 0:
       x = jnp.concatenate([x, last_features], axis=1)
 
     if debug:
-      debug_output["lstm_reshaped_with_nonlstm_features"] = x
+      debug_output["lstms_concat_with_nonlstm_features"] = x
 
     for i in range(0,len(self.dense_sizes)):
       name = f'dense_{i}'
