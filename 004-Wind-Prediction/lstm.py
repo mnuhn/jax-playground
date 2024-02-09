@@ -35,6 +35,8 @@ class ModelDescription:
     self.lstms = []
 
     for lstm_description_str in s.split(";"):
+      if lstm_description_str == "":
+        continue
       lstm = LstmDescription(lstm_description_str)
       self.lstms.append(lstm)
 
@@ -116,7 +118,11 @@ class LSTM(nn.Module):
 
       lstm_outs.append(cur_lstm_out)
 
-    x = jnp.concatenate(lstm_outs, axis=1)
+    if len(lstm_outs) > 0:
+      x = jnp.concatenate(lstm_outs, axis=1)
+    else:
+      print("no LSTMs being added")
+      x = x.reshape((x.shape[0], -1))  # flatten
 
     if debug:
       debug_output["lstms_concat"] = x
