@@ -26,6 +26,7 @@ parser.add_argument('--future', type=int, default=128)
 parser.add_argument('--copy', type=bool, default=False)
 parser.add_argument('--history_features', type=str, default="wind_speed,gust_speed,air_pressure,air_temp,sin_wind_dir,cos_wind_dir,sin_hour,cos_hour")
 parser.add_argument('--predict_features', type=str, default='wind_speed')
+parser.add_argument('--output_range', type=preprocess.parse_output_range, default='ZERO_TO_ONE')
 args = parser.parse_args()
 
 def generate_examples(fns, history, predictions, history_features, predict_features, test_year=args.test_year, permute=True):
@@ -45,7 +46,7 @@ def generate_examples(fns, history, predictions, history_features, predict_featu
   predict_columns = [preprocess.FIELDS.index(i) for i in predict_features]
 
   data_orig = data
-  data = preprocess.preprocess_features(data)
+  data = preprocess.preprocess_features(data, args.output_range)
   data_size = len(data)
 
 
@@ -105,6 +106,9 @@ def generate_examples(fns, history, predictions, history_features, predict_featu
     Y = Y[x_perm]
     XT = XT[xt_perm]
     YT = YT[xt_perm]
+
+  print("Min X:", np.min(X, axis=(0,1)))
+  print("Max X:", np.max(X, axis=(0,1)))
 
   np.savez(args.output_file, x_train=X, y_train=Y, x_test=XT, y_test=YT)
 
