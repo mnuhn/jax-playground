@@ -39,6 +39,9 @@ class LSTM(nn.Module):
 
       return x
 
+    if self.down_scale > 1:
+      x = nn.max_pool(x, window_shape=(self.down_scale,), strides=(self.down_scale,))
+
     for i, dim in enumerate(self.conv_channels):
       x = lstm_layer(x, dim)
 
