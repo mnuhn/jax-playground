@@ -1,7 +1,10 @@
 function TRAIN() {
   WHAT="$1"
   DROPOUT="$2"
-  python3 train.py --data=./data/both.clean.small.10feature.1feature.256h.examples.npz --model=lstm --epochs=20 --nonconv_features=4 --dropout="${DROPOUT}" --tensorboard=true --draw=true --debug_every=1 --draw_every=5 --prefix=new --model_arch="${WHAT}"
+  echo
+  echo
+  echo "Running ${WHAT}"
+  python3 train.py --data=./data/both.clean.small.10feature.1feature.256h.examples.npz --model=lstm --epochs=5 --nonconv_features=4 --dropout="${DROPOUT}" --tensorboard=true --draw=true --debug_every=5 --draw_every=20 --prefix=new --model_arch="${WHAT}"
 }
 
 # Recent timesteps
@@ -74,9 +77,9 @@ STACK_REC_64_B="[${HIST_REC_64};${CONV_16};${LSTM_30}]"
 STACK_REC_64_C="[${HIST_REC_64};${CONV_32};${LSTM_10}]"
 STACK_REC_64_D="[${HIST_REC_64};${CONV_32};${LSTM_30}]"
 
-STACK_REC_128_FLAT_A="[${HIST_REC_128}]"
-STACK_REC_128_FLAT_B="[${HIST_REC_128};${M_2}]"
-STACK_REC_128_FLAT_C="[${HIST_REC_128};${M_4}]"
+STACK_REC128_FLAT_A="[${HIST_REC128}]"
+STACK_REC128_FLAT_B="[${HIST_REC128};${M_2}]"
+STACK_REC128_FLAT_C="[${HIST_REC128};${M_4}]"
 
 STACK_REC128_A="[${HIST_REC128};${CONV_16};${LSTM_10}]"
 STACK_REC128_B="[${HIST_REC128};${CONV_16};${LSTM_30}]"
@@ -85,7 +88,7 @@ STACK_REC128_D="[${HIST_REC128};${CONV_32};${LSTM_30}]"
 
 # Stacks over data points around 24h ago.
 STACK_24H_32_FLAT_A="[${HIST_24H_32}]"
-STACK_24H_32_FLAT_B="[${HIST_24H_32;${M_2}}]"
+STACK_24H_32_FLAT_B="[${HIST_24H_32};${M_2}}]"
 
 STACK_24H_32_A="[${HIST_24H_32};${CONV_16};${LSTM_10}]"
 STACK_24H_32_B="[${HIST_24H_32};${CONV_16};${LSTM_30}]"
