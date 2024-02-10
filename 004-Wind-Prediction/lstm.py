@@ -8,47 +8,72 @@ from flax import traverse_util
 from jax import tree_util
 from visualizer import Visualizer
 
-# Model descriptor looks like this:
-# HistoryA:dimA0,dimA1,...;HistoryB:dimB0,dimB1,...
-# model_description = "128:10,10;64:5,5"
+# Layers:
+# * C: convolutional layer - ch: channels, k: kernel size
+# * L: LSTM layer - ch: "channels"
+# * D: dense layer - d: dimension
+# * M: max pool layer - w: width
 
-class LstmDescription:
-  history: int
-  downsample: int
-  layer_dims: list[int]
+def parse_layer_details(char, details_str):
+  details = {}
+  if char == 'I':
+    details['type'] = 'input'
+  elif char == 'C':
+    details['type'] = 'conv'
+  elif char == 'D':
+    details['type'] = 'dense'
+  elif char == 'L':
+    details['type'] = 'lstm'
+  elif char == 'M':
+    details['type'] = 'maxpool'
+  else:
+    assert False
+  for detail in details_str.split(','):
+    key, value = detail.split(':')
+    details[key] = int(value)
+  return details
 
-  def __init__(self, s):
-    history_downsample_str, layer_description_str = s.split(":")
-    history_str, downsample_str = history_downsample_str.split(",")
-    self.history = int(history_str)
-    self.downsample = int(downsample_str)
-    layer_dims = layer_description_str.split(",")
-    self.layer_dims = [ int(x) for x in layer_dims ]
+def parse_arch(encoded_str):
+  stack = []
+  current_group = []
 
-  def __str__(self):
-    return f"LSTM \u007b History: {self.history} Dims: {self.layer_dims} \u007d"
+  i = 0
+  while i < len(encoded_str):
+    char = encoded_str[i]
 
-class ModelDescription:
-  lstms: list[LstmDescription]
+    if char == '[':  # Start of a repeatable group
+      stack.append(current_group)
+      current_group = []
+      i += 1
 
-  def __init__(self, s):
-    self.lstms = []
+    elif char in ['I', 'C', 'L', 'M', 'D']:  # Layer indicator
+      j = encoded_str.find('}', i + 1)
+      layer_details_str = encoded_str[i+2:j]
+      layer_details = parse_layer_details(char, layer_details_str)
 
-    for lstm_description_str in s.split(";"):
-      if lstm_description_str == "":
-        continue
-      lstm = LstmDescription(lstm_description_str)
-      self.lstms.append(lstm)
+      current_group.append(layer_details)
+      i = j + 1
 
-  def __str__(self):
-    inner = " ".join([ str(l) for l in self.lstms])
-    result = "Model { " + inner + " }"
-    return result
+    elif char == ']':  # End of a repeatable group
+      last_group = current_group
+      current_group = stack.pop()
+      current_group.append(last_group)
+      i += 1
+
+    elif char == '|':  # Separator for parallel groups, treat as new group
+      current_group = []
+      i += 1
+    else:
+      i += 1
+
+  if stack:
+      raise ValueError("Unmatched brackets in the input string.")
+
+  return current_group
 
 class LSTM(nn.Module):
   predictions: int
-  model_desc: ModelDescription
-  dense_sizes: list[int]
+  model_arch: list
   features_per_prediction: int
   dropout: float
   nonlstm_features: int
@@ -66,12 +91,9 @@ class LSTM(nn.Module):
 
     if self.nonlstm_features > 0:
       last_features = x[:,-1,-self.nonlstm_features:]
-      rest = x[:,:,:-self.nonlstm_features]
-
-      x = rest
+      x = x[:,:,:-self.nonlstm_features]
 
       if debug:
-        debug_output["input_lstm"] = rest
         debug_output["last_features"] = last_features
 
     def lstm_layer(x, dim):
@@ -89,80 +111,93 @@ class LSTM(nn.Module):
 
       return x
 
-    lstm_outs = []
+    stack_outputs = []
+    # CNN/LSTM Layers
+    for stack_idx, stack in enumerate(self.model_arch[0]):
+      cur_stack_x = x
+      for piece_idx, piece in enumerate(stack):
+        if piece['type'] == 'input':
+          assert piece_idx == 0
+          f = int(piece['fr'])
+          t = int(piece['to'])
+          assert f < t
+          if t == 0:
+            cur_stack_x = cur_stack_x[:, f:, :]
+          else:
+            cur_stack_x = cur_stack_x[:, f:t, :]
+          if debug:
+            debug_output[f"stack_{stack_idx}_{piece_idx}_in"] = cur_stack_x
+        elif piece['type'] == 'conv':
+          channels = int(piece['ch'])
+          kernel_size = int(piece['k'])
+          assert channels > 0
+          assert kernel_size > 0
+          cur_stack_x = nn.Conv(features=channels, kernel_size=(kernel_size,), padding='SAME')(cur_stack_x)
+          if debug:
+            debug_output[f"stack_{stack_idx}_{piece_idx}_conv"] = cur_stack_x
+          if self.dropout > 0.0:
+            cur_stack_x = nn.Dropout(rate=self.dropout, deterministic=not train)(cur_stack_x)
+          cur_stack_x = nn.relu(cur_stack_x)
+        elif piece['type'] == 'maxpool':
+          width = int(piece['w'])
+          assert width > 1
+          cur_stack_x = nn.max_pool(cur_stack_x, window_shape=(width,), strides=(width,))
+          if debug:
+            debug_output[f"stack_{stack_idx}_{piece_idx}_maxpool"] = cur_stack_x
+          if self.dropout > 0.0:
+            cur_stack_x = nn.Dropout(rate=self.dropout, deterministic=not train)(cur_stack_x)
+          cur_stack_x = nn.relu(cur_stack_x)
+        elif piece['type'] == 'lstm':
+          dim = int(piece['ch'])
+          assert dim > 0
+          cur_stack_x = lstm_layer(cur_stack_x, dim)
+          if debug:
+            debug_output[f"stack_{stack_idx}_{piece_idx}_lstm"] = cur_stack_x
+          if self.dropout > 0.0:
+            cur_stack_x = nn.Dropout(rate=self.dropout, deterministic=not train)(cur_stack_x)
+        else:
+          assert False
+      cur_stack_x_last = cur_stack_x[:, -1, :]
+      stack_outputs.append(cur_stack_x_last)
 
-    for i, lstm in enumerate(self.model_desc.lstms):
-      cur_lstm_x = x[:, -lstm.history:, :]
-
-      if debug:
-        debug_output[f"lstm_{i}_in"] = cur_lstm_x
-
-      if lstm.downsample > 1:
-        cur_lstm_x = nn.max_pool(cur_lstm_x, window_shape=(lstm.downsample,), strides=(lstm.downsample,))
-        if debug:
-          debug_output[f"lstm_{i}_downsampled"] = cur_lstm_x
-
-      for j, dim in enumerate(lstm.layer_dims):
-        print(i, j, dim)
-        cur_lstm_x = lstm_layer(cur_lstm_x, dim)
-        if debug:
-          debug_output[f"lstm_{i}_{j}"] = cur_lstm_x
-        if self.dropout > 0.0:
-          cur_lstm_x = nn.Dropout(rate=self.dropout, deterministic=not train)(cur_lstm_x)
-      
-      cur_lstm_out = cur_lstm_x[:, -1, :]
-      cur_lstm_out = cur_lstm_out.reshape((x.shape[0], -1))  # flatten
-
-      if debug:
-        debug_output[f"lstm_{i}_last_state"] = cur_lstm_out
-
-      lstm_outs.append(cur_lstm_out)
-
-    if len(lstm_outs) > 0:
-      x = jnp.concatenate(lstm_outs, axis=1)
-    else:
-      print("no LSTMs being added")
-      x = x.reshape((x.shape[0], -1))  # flatten
+    assert len(stack_outputs) > 0
+    x = jnp.concatenate(stack_outputs, axis=1)
+    x = x.reshape((x.shape[0], -1))  # flatten
 
     if debug:
-      debug_output["lstms_concat"] = x
+      debug_output['stacked_outputs'] = x
 
-    if self.nonlstm_features > 0:
-      x = jnp.concatenate([x, last_features], axis=1)
+    x = jnp.concatenate([x, last_features], axis=1)
 
     if debug:
-      debug_output["lstms_concat_with_nonlstm_features"] = x
+      debug_output['stacked_outputs_with_static_features'] = x
 
-    for i in range(0,len(self.dense_sizes)):
-      name = f'dense_{i}'
-      debug_output[f"{name}_act"] = x
+    ## Dense Layers
+    for dense_idx, dense in enumerate(self.model_arch[1]):
+      dim = int(dense['d'])
+      assert dim > 0
 
-      x = nn.Dense(features=self.dense_sizes[i])(x)
+      x = nn.Dense(features=dim)(x)
+      debug_output[f'dense_{dense_idx}_out'] = x
+      x = nn.relu(x)
+      debug_output[f'dense_{dense_idx}_relu'] = x
 
       if self.dropout > 0.0:
         x = nn.Dropout(rate=self.dropout, deterministic=not train)(x)
-
-      x = nn.relu(x)
-
-      if debug:
-        debug_output[f"{name}_relu"] = x
-
+    
+    # Final Layer
     x = nn.Dense(features=self.predictions*self.features_per_prediction, kernel_init=initializers.glorot_uniform())(x)
     x = x.reshape((-1, self.predictions, self.features_per_prediction))
-
-    if debug:
-      debug_output[f"final_act"] = x
-
     x = nn.sigmoid(x)
 
     if debug:
-      debug_output["final"] = x
-
+      debug_output['prediction'] = x
 
     if debug:
       return x, debug_output
 
     return x
+
 
   def loss(self, params, x, y):
     p = self.apply(params,x)

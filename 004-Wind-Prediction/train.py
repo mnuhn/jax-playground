@@ -8,6 +8,8 @@ from flax.metrics import tensorboard
 from flax.training import train_state
 from jax import grad, jit, random
 from jax import lax
+
+import hashlib
 import flax
 import jax
 import jax.nn
@@ -27,7 +29,6 @@ import sys
 
 import data
 import lstm
-import cnn
 
 p = argparse.ArgumentParser(description='...')
 
@@ -46,15 +47,11 @@ p.add_argument('--data', type=str)
 p.add_argument('--model', type=str, default=None)
 p.add_argument('--model_arch', type=str, default=None)
 
-p.add_argument('--down_scale', type=int, default=2)
-p.add_argument('--dense_sizes', type=str, default="100")
-p.add_argument('--conv_channels', type=str, default="20,40")
-p.add_argument('--conv_len', type=int, default=8)
 p.add_argument('--nonconv_features', type=int, default=0)
 p.add_argument('--padding', type=str, default='SAME')
 
 # Training params.
-p.add_argument('--batch_size', type=int, default=256)
+p.add_argument('--bs', type=int, default=256)
 p.add_argument('--lr', type=float, default=0.001)
 p.add_argument('--dropout', type=float, default=0.0)
 p.add_argument('--batch_norm', type=bool, default=False)
@@ -66,18 +63,20 @@ p.add_argument('--loss_fac', type=float, default=1.0)
 p.add_argument('--model_name', type=str, default=None)
 p = p.parse_args()
 
-def params_debug_str(history_len, history_feature_cnt):
+def params_hash(history_len, history_feature_cnt):
   debug_strs = [f"histlen{history_len}", f"histfeats{history_feature_cnt}"]
-  skip = ['data', 'debug_every_percent', 'log_dir', 'model_name', 'dry_run', 'tensorboard', 'model_arch']
+  skip = ['debug_every_percent', 'log_dir', 'model_name', 'dry_run', 'tensorboard', 'draw_every_percent', 'png']
 
   for arg in vars(p):
     if arg in skip:
       continue
     value = getattr(p, arg)
-    value = re.sub(r'[,]+', '-', str(value))
-    debug_strs.append(f"{arg}{value}")
-  debug_str = "-".join(debug_strs)
-  return debug_str
+    debug_strs.append(f"{arg}:{value}")
+  debug_str = ",".join(debug_strs)
+
+  sha_1 = hashlib.sha1()
+  sha_1.update(debug_str.encode('utf8'))
+  return sha_1.hexdigest()[:8]
 
 print("Loading data from", p.data)
 
@@ -103,16 +102,9 @@ predict_feature_cnt = Y.shape[2]
 
 print("Loading data from", p.data, "done")
 
-if p.conv_channels == 'None':
-  conv_channels = []
-else:
-  conv_channels = [ int(x) for x in p.conv_channels.split(",") ]
-
-dense_sizes = [ int(x) for x in p.dense_sizes.split(",") ]
-
 if p.log_dir == None:
-  debug_str = params_debug_str(history_len, history_feature_cnt)
-  p.log_dir = f'tb/{debug_str}'
+  params_hash_str = params_hash(history_len, history_feature_cnt)
+  p.log_dir = f'tb/{params_hash_str}'
 
 print("Logging to", p.log_dir)
 
@@ -127,24 +119,11 @@ if p.dry_run:
 print('JAX devices:', jax.devices())
 
 m = None
-if p.model == "cnn":
-  m = cnn.CNN(
-          conv_channels=conv_channels,
-          conv_len=p.conv_len,
-          dense_sizes=dense_sizes,
-          down_scale=p.down_scale,
-          predictions=predictions,
-          features_per_prediction=predict_feature_cnt,
-          batch_norm=p.batch_norm,
-          dropout=p.dropout,
-          padding=p.padding,
-          nonconv_features=p.nonconv_features,
-          )
-elif p.model == "lstm":
-  m_desc = lstm.ModelDescription(p.model_arch)
+if p.model == "lstm":
+  model_arch = lstm.parse_arch(p.model_arch)
+  assert len(model_arch) == 2
   m = lstm.LSTM(
-          model_desc=m_desc,
-          dense_sizes=dense_sizes,
+          model_arch=model_arch,
           predictions=predictions,
           features_per_prediction=predict_feature_cnt,
           dropout=p.dropout,
@@ -162,7 +141,7 @@ def getbatch(X,Y,batch_size):
     for i in range(0, int(len(X)/batch_size)):
       yield X[i*batch_size:(i+1)*batch_size,:], Y[i*batch_size:(i+1)*batch_size]
 
-batcher = getbatch(X,Y,p.batch_size)
+batcher = getbatch(X,Y,p.bs)
 x_batch, y_batch = next(batcher)
 
 root_key = jax.random.key(seed=0)
@@ -249,9 +228,9 @@ def eval_step(state: TrainState, x, y):
   return state, loss, debug
 
 examples = X.shape[0]
-iters = int(p.epochs * (examples / p.batch_size))
+iters = int(p.epochs * (examples / p.bs))
 
-print(f"Having {examples} examples and batch size {p.batch_size},")
+print(f"Having {examples} examples and batch size {p.bs},")
 print(f"to run {p.epochs} epochs need to run {iters}.")
 
 pbar = tqdm(range(int(iters)))
@@ -263,18 +242,15 @@ eval_loss = 0.0
 
 if summary_writer:
   summary_writer.hparams(hparams = {
-      'batch_size': int(p.batch_size),
+      'batch_size': int(p.bs),
       'history_feature_cnt': int(history_feature_cnt),
       'history_len': int(history_len),
       'predict_len': int(predict_len),
       'batch_norm': bool(p.batch_norm),
-      'dense_size': str(dense_sizes),
-      'conv_channels': str(conv_channels),
       'learning_rate': p.lr,
-      'down_scale': int(p.down_scale),
       'dropout': float(p.dropout),
-      'conv_len': int(p.conv_len),
       'model': p.model,
+      'arch': p.model_arch,
       })
 
 for step in pbar:
