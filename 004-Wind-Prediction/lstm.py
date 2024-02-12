@@ -115,6 +115,7 @@ class LSTM(nn.Module):
     # CNN/LSTM Layers
     for stack_idx, stack in enumerate(self.model_arch[0]):
       cur_stack_x = x
+      cur_stack_out = None
       for piece_idx, piece in enumerate(stack):
         if piece['type'] == 'input':
           assert piece_idx == 0
@@ -127,6 +128,7 @@ class LSTM(nn.Module):
             cur_stack_x = cur_stack_x[:, f:t, :]
           if debug:
             debug_output[f"stack_{stack_idx}_{piece_idx}_in"] = cur_stack_x
+          cur_stack_out = cur_stack_x
         elif piece['type'] == 'conv':
           channels = int(piece['ch'])
           kernel_size = int(piece['k'])
@@ -138,6 +140,7 @@ class LSTM(nn.Module):
           if self.dropout > 0.0:
             cur_stack_x = nn.Dropout(rate=self.dropout, deterministic=not train)(cur_stack_x)
           cur_stack_x = nn.relu(cur_stack_x)
+          cur_stack_out = cur_stack_x
         elif piece['type'] == 'maxpool':
           width = int(piece['w'])
           assert width > 1
@@ -147,6 +150,7 @@ class LSTM(nn.Module):
           if self.dropout > 0.0:
             cur_stack_x = nn.Dropout(rate=self.dropout, deterministic=not train)(cur_stack_x)
           cur_stack_x = nn.relu(cur_stack_x)
+          cur_stack_out = cur_stack_x
         elif piece['type'] == 'lstm':
           dim = int(piece['ch'])
           assert dim > 0
@@ -155,10 +159,10 @@ class LSTM(nn.Module):
             debug_output[f"stack_{stack_idx}_{piece_idx}_lstm"] = cur_stack_x
           if self.dropout > 0.0:
             cur_stack_x = nn.Dropout(rate=self.dropout, deterministic=not train)(cur_stack_x)
+          cur_stack_out = cur_stack_x[:, -1, :]
         else:
           assert False
-      cur_stack_x_last = cur_stack_x[:, -1, :]
-      stack_outputs.append(cur_stack_x_last)
+      stack_outputs.append(cur_stack_out)
 
     assert len(stack_outputs) > 0
     x = jnp.concatenate(stack_outputs, axis=1)
