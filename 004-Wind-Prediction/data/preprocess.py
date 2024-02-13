@@ -1,5 +1,15 @@
 import numpy as np
 import jax.numpy as jnp
+from enum import Enum
+
+OutputRange = Enum("OutputRange", ["MINUS_ONE_TO_ONE", "ZERO_TO_ONE"])
+
+def parse_output_range(range_str):
+  try:
+    return OutputRange[range_str.upper()]
+  except KeyError:
+    raise argparse.ArgumentTypeError(f"Invalid range: {range_str}")
+
 
 FIELDS = ["year", "month", "day", "hour", "minute", "seconds", "air_temp",
           "humidity", "gust_speed", "wind_speed", "wind_strength", "wind_dir",
@@ -35,19 +45,31 @@ COS_WIND_DIR = 21
 DATETIME = 22
 GAP = 23
 
-def range_to_unit(data, y_min, y_max):
-  assert y_min < y_max
-  scaled = (data - y_min) / (y_max - y_min)
-  scaled = np.clip(scaled, 0.0, 1.0)
-  return scaled
-
 def get_date(row):
   return datetime.datetime(year=int(row[0]), month=int(row[1]),
                     day=int(row[2]), hour=int(row[3]),
                     minute=int(row[4]), second=int(row[5]))
 
+def preprocess_features(data, output_range = OutputRange.MINUS_ONE_TO_ONE):
+  def range_to_unit(data, y_min, y_max):
+    assert y_min < y_max
+    scaled = (data - y_min) / (y_max - y_min)
+    if output_range == OutputRange.MINUS_ONE_TO_ONE:
+      scale = 2 * scaled - 1
+      scaled = np.clip(scaled, -1.0, 1.0)
+    else:
+      assert output_range == OutputRange.ZERO_TO_ONE
+      scaled = np.clip(scaled, 0.0, 1.0)
+    return scaled
 
-def preprocess_features(data):
+  def trig(data, period, fun):
+    result = fun(2.0 * np.pi * data / period)
+    if output_range == OutputRange.ZERO_TO_ONE:
+      result = 0.5 * (1.0 + result)
+    else:
+      assert output_range == OutputRange.MINUS_ONE_TO_ONE
+    return result
+
   # Preprocess
   data[:,WIND_SPEED] = range_to_unit(data[:,WIND_SPEED], 0.0, 25.0)
   data[:,GUST_SPEED] = range_to_unit(data[:,GUST_SPEED], 0.0, 25.0)
@@ -58,21 +80,22 @@ def preprocess_features(data):
   # Add 2 new fields.
   data = np.c_[data, data[:,HOUR]]
   data = np.c_[data, data[:,HOUR]]
-  data[:,SIN_HOUR] = 0.5 * ( 1.0 + jnp.sin(2.0 * np.pi * data[:, SIN_HOUR] / 24.0))
-  data[:,COS_HOUR] = 0.5 * ( 1.0 + jnp.cos(2.0 * np.pi * data[:, COS_HOUR] / 24.0))
+  data[:,SIN_HOUR] = trig(data[:, SIN_HOUR], 24.0, jnp.sin)
+  data[:,COS_HOUR] = trig(data[:, COS_HOUR], 24.0, jnp.cos)
 
   # Add 2 new fields.
   data = np.c_[data, data[:,MONTH]]
   data = np.c_[data, data[:,MONTH]]
-  data[:,SIN_MONTH] = 0.5 * ( 1.0 + jnp.sin(2.0 * np.pi * data[:, SIN_MONTH] / 12.0))
-  data[:,COS_MONTH] = 0.5 * ( 1.0 + jnp.cos(2.0 * np.pi * data[:, COS_MONTH] / 12.0))
+  data[:,SIN_MONTH] = trig(data[:, SIN_MONTH], 12.0, jnp.sin)
+  data[:,COS_MONTH] = trig(data[:, COS_MONTH], 12.0, jnp.cos)
 
   # Add 2 new fields.
   data = np.c_[data, data[:,WIND_DIR]]
   data = np.c_[data, data[:,WIND_DIR]]
-  data[:,SIN_WIND_DIR] = 0.5 * ( 1.0 + jnp.sin(2.0 * np.pi * data[:, SIN_WIND_DIR] / 360.0))
-  data[:,COS_WIND_DIR] = 0.5 * ( 1.0 + jnp.cos(2.0 * np.pi * data[:, COS_WIND_DIR] / 360.0))
-  data[:,WIND_DIR] = range_to_unit(data[:,WIND_DIR], 0.0, 359.0)
+  data[:,SIN_WIND_DIR] = trig(data[:, SIN_WIND_DIR], 360.0, jnp.sin)
+  data[:,COS_WIND_DIR] = trig(data[:, COS_WIND_DIR], 360.0, jnp.cos)
+
+  data[:,WIND_DIR] = range_to_unit(data[:,WIND_DIR], 0.0, 360.0)
 
   # Add 1 new field.
   data = np.c_[data, data[:,YEAR]]
@@ -93,6 +116,3 @@ def preprocess_features(data):
   data[:,SECONDS] = range_to_unit(data[:,SECONDS], 0.0, 59.0)
 
   return data
-
-
-

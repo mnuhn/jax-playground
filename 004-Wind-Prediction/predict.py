@@ -38,15 +38,7 @@ p = p.parse_args()
 X, Y, XT, YT = data.get_data(p.timeseries, ["wind_speed"] + p.features.split(","), history=p.history, predictions=p.predictions, permute=False)
 
 m = None
-if p.model == "cnn":
-  m = model.CNN(
-          channels=p.channels,
-          conv_len=p.conv_len,
-          dense_size=p.dense_size,
-          down_scale=p.down_scale,
-          predictions=p.predictions,
-          )
-elif p.model == "lstm":
+if p.model == "lstm":
   m = model.LSTM(
           hidden_state_dim=p.channels,
           dense_size=p.dense_size,
