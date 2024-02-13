@@ -156,7 +156,6 @@ class LSTM(nn.Module):
             debug_output[f"stack_{stack_idx}_{piece_idx}_maxpool"] = cur_stack_x
           if self.dropout > 0.0:
             cur_stack_x = nn.Dropout(rate=self.dropout, deterministic=not train)(cur_stack_x)
-          cur_stack_x = nn.relu(cur_stack_x)
           cur_stack_out = cur_stack_x
         elif piece['type'] == 'lstm':
           dim = int(piece['ch'])
