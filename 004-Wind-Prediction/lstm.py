@@ -111,6 +111,13 @@ class LSTM(nn.Module):
 
       return x
 
+    def lstm_layer2(x, dim):
+      cell = nn.OptimizedLSTMCell(dim)
+      #cell = nn.GRUCell(dim)
+      cell.initialize_carry(jax.random.key(0), x[:, 0, :].shape)
+      rnn = nn.RNN(cell)
+      return rnn(x)
+
     stack_outputs = []
     # CNN/LSTM Layers
     for stack_idx, stack in enumerate(self.model_arch[0]):
@@ -154,7 +161,7 @@ class LSTM(nn.Module):
         elif piece['type'] == 'lstm':
           dim = int(piece['ch'])
           assert dim > 0
-          cur_stack_x = lstm_layer(cur_stack_x, dim)
+          cur_stack_x = lstm_layer2(cur_stack_x, dim)
           if debug:
             debug_output[f"stack_{stack_idx}_{piece_idx}_lstm"] = cur_stack_x
           if self.dropout > 0.0:
