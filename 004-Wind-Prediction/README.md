@@ -1,6 +1,6 @@
-# Wind Prediction for Lake Zurich (CNNs, LSTMs) in JAX
+# Wind Prediction for Lake Zurich in JAX (from Scratch)
 
-Wind/Gust Speed and Direction | Activations during Training
+Wind/Gust Speed and Direction | LSTM and Dense Activations during Training
 ---|---
 <img src="wind.png" width="500px"> | ![Training](training.gif)
 
