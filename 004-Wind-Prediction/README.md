@@ -1,37 +1,45 @@
 # Wind Prediction for Lake Zurich (CNNs, LSTMs) in JAX
 
-Keywords: Dataset preparataion. Jax, Tensorboard, Visualization, CNNs,
-Debugging, Max-Pooling, Batchnorm (not), Regression.  Evaluation of the
-features. Comparison of Model architectures.
-
-Wind/Gust Speed|Wind Direction
+Wind/Gust Speed and Direction | Activations during Training
 ---|---
-![Wind](wind1.png) | ![Wind](wind2.png)
+<img src="wind.png" width="500px"> | ![Training](training.gif)
+
 
 # Overview
 * [Intro](#intro)
 * [Task Definition](#task-definition)
 * [Preparing Wind Data](#preparing-wind-data)
 * [Model Architectures](#model-architectures)
-  * Dense NN
-  * CNNs
-* Loss functions
-  * MSE
-  * Weighted MSE
-  * Huber-Loss
-* Debugging
-  * Comparing with Baselines
-  * Tensorboard
-  * Drawing Activations
-* Results
+* [Training](#training)
+* [Debugging](#debugging)
+* [Results](#results)
 
 # Intro
 
-In this project, I scrape wind data for 2 weather stations at lake Zurich. I
-preprocess the data (feature extraction, data cleanup), and evaluate different
-features and model architectures on the data.
+In this project, I scrape wind data for 2 weather stations at lake Zurich. The
+data is sampled at intervals of 10 minutes and has the following features:
 
-I implemented a small descriptor to explore different architectures:
+* wind speed (m/s)
+* gust speed (m/s)
+* wind direction
+* air temperature (celsius)
+* water temperature (celsius)
+* humidity (%)
+* air pressure (hPa)
+* date/time
+
+The goal is to read the past N timesteps (any observations we have) and predict
+the next M timesteps for wind speed. I separate train/test sets by years (i.e.
+train on 2019-2022 and evaluate on 2023). I use the root-mean-square error
+(RMSE) between the predictions and the ground truth to evaluate the model. I
+typically predicted 16 timesteps (so 2h and 40mins into the future, which is
+enough for a short sailing trip on the lake).
+
+I then preprocess the data (feature normalization/preprocessing, data cleanup),
+and the impact of the features, model architectures and training schemes on them.
+
+To evaluate different classes of model architectures, I implemented a small
+descriptor to represent such architectures efficiently:
 
 Descriptor | Explanation
 :--|:--
@@ -47,33 +55,42 @@ Descriptor | Explanation
 [[I{fr:-256,to:0};M{w:4};L{ch:30}];[I{fr:-32,to:0};L{ch:10}]];[D{d:40};D{d:40}]
 ```
 
+What it does:
 * Take the last 256 time steps, max pool with width 4, and apply 1 LSTM layer (dim: 30) to it.
 * Take the last 32 time steps, and apply 1 LSTM layer (dim: 10) to it.
 * Concatenate the outputs of the final state
 * Run it through 2 layers of a dense network
 
-I also implement model debugging to visualize the model architecture and
-activations during inference. This is what overall model looks like (color
-indicate the activations for a given example, I cut out the 256 steps long
-original input for brevity):
+All training runs are exported to Tensorboard
+![Tensorboard](tensorboard.png)
 
+I also export gradients, activations, and a visualization of the model
+architecture directly to Tensorboard for debugging purposes.
+
+Gradients | Activations | Model Architecture
+---|---|---
+![Gradients](tensorboard-gradients.png)|![Activations](tensorboard-activations.png)|![Model Architecture in Tensorboard](tensorboard-arch.png)
+
+Here is a closer look at the visualization of the model during inference:
 ![Activations](activations.png)
 
-# Task Definition
+Note that I always do some special handling of "static" features (date/time),
+see `stacked_outputs_with_static_features`.
 
-The goal is to read the past N timesteps (any observations we have) and predict
-the next M timesteps for wind speed.
-
-We will use data from different years for training and evaluation.
-
-We use the root-mean-square error (RMSE) between the predictions and the ground
-truth to evaluate the model.
+Besides for the pure fun of looking at it, I used the above visualizations
+mostly to make sure the code is implemented correctly - and to check for things
+like exploding or vanishing gradients.
 
 # Preparing Wind Data
+
+Please see the scripts to download and prepare the wind data in `./data/`. The
+scripts are missing the URL of the source on purpose, as they don't officially
+permit scraping it.
 
 ## Download the HTMLs you want
 
 ```
+# Example: Download data from January 2017
 bash download-htmls.sh mythenquai 2017 01
 bash download-htmls.sh tiefenbrunnen 2017 01
 ```
@@ -89,7 +106,7 @@ python3 parse-and-write-timeseries.py \
 ## Filter days with broken data
 
 `check-data.py` runs over data for each day and throws out days for which there
-is at least 1 entry NOT fullfilling the folowing conditions:
+is at least 1 entry NOT fullfilling the following conditions:
 
 Field        | What       |   Min | Max
 -------------|------------|------:|------:
@@ -105,13 +122,16 @@ WIND_DIR     | % non-zero |  20.0 |  100.0
 WIND_DIR     | Value      |   0.0 |  360.0
 AIR_PRESSURE | Value      | 800.0 | 1200.0
 
+This is needed because there are some days when a given sensor seems to report
+broken data (or no data at all).
+
 ```
 python3 check-data.py \
   --file=mythenquai.raw.npy \
   --output_file=./mythenquai.clean.npy
 ```
 
-## Preprocessing
+## Feature Scaling
 
 Data is preprocessed using `preprocess.py`. In particular, all features are
 scaled to have a range of [0,1]. For this, the following input ranges are
@@ -131,10 +151,18 @@ COS_MONTH    | n/a   | -1.0  | 1.0
 SIN_WIND_DIR | n/a   | -1.0  | 1.0
 COS_WIND_DIR | n/a   | -1.0  | 1.0
 
+I did use static min and max values. I guess I could also have used something
+like a `MinMax` scaler to do it automatically.
+
+Note that I created Sine and Cosine features for "periodic" values such as hour
+of the day, month and wind direction. From my experiments, it doesn't make a
+huge difference - but I do think it makes a lot of sense to use these instead
+of the raw values (otherwise you will have "jumps" in the input features).
+
 ## Generate final train and test data
 
-The following tool generates the final train and test data. It takes the
-following parameters:
+The `generate-examples.py` tool generates the final train and test data. It
+takes the following parameters:
 
 Parameter   | Description
 ------------|-----------------------------------------------------------
@@ -151,7 +179,9 @@ Y     | [N,Predictions]      |
 XT    | [M,History,Features] | M is the number of test examples
 YT    | [M,Predictions]      |
 
-Only examples that have no gap in the input training data are used as examples.
+Only examples that have no "gap" in the input training data are used as
+examples: if there is 1 missing value in the middle of the day, no examples
+that have some overlap with with that point in time will be output.
 
 Note that the generate data is quite redundant, as can be seen in this example
 (with Features=1, History=4, Future=2). Unnecessary nesting is removed:
@@ -162,6 +192,9 @@ X | Y
 [2, 3, 4, 5] | [6, 7]
 [3, 4, 5, 6] | [7, 8]
 ...|...
+
+I could also do these kinds of computations on the fly - but I preferred to
+have it persisted this way, so I could inspect and debug the data more easily.
 
 ## Generate data with `history=16`, `future=16`:
 
