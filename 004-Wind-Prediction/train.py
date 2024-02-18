@@ -305,6 +305,6 @@ for step in pbar:
 if summary_writer:
   summary_writer.flush()
 
-#if p.model_name:
-#  with open(p.model_name, "wb") as store:
-#    store.write(flax.serialization.to_bytes(params))
+if p.model_name:
+  with open(p.model_name, "wb") as store:
+    store.write(flax.serialization.to_bytes(params))
