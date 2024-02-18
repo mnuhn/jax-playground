@@ -226,12 +226,12 @@ To start, I implement some very basic baselines and evaluate them:
 Here are the results for `both.clean.small.8feature.16h.examples.npz`:
 
 History | Algorithm        | RMSE
---------|------------------|--------
-n/a     |       last_value | 0.04364
-16      |       mean_value | 0.04364
-32      |       mean_value | 0.04508
-n/a     | const_value_0.07 | 0.05752
-n/a     | const_value_0.00 | 0.08766
+--------|------------------|-------
+n/a     |       last_value | 0.0436
+16      |       mean_value | 0.0436
+32      |       mean_value | 0.0450
+n/a     | const_value_0.07 | 0.0575
+n/a     | const_value_0.00 | 0.0876
 
 So just repeating the last wind speed for the next 16 timesteps is the best
 (out of these simple baselines). Using the mean value over the last 16 or 32
