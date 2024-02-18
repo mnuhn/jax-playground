@@ -146,6 +146,8 @@ class LSTM(nn.Module):
             debug_output[f"stack_{stack_idx}_{piece_idx}_conv"] = cur_stack_x
           if self.dropout > 0.0:
             cur_stack_x = nn.Dropout(rate=self.dropout, deterministic=not train)(cur_stack_x)
+          if self.batch_norm:
+            cur_stack_out = nn.BatchNorm(use_running_average=not train)(cur_stack_x) 
           cur_stack_x = nn.relu(cur_stack_x)
           cur_stack_out = cur_stack_x
         elif piece['type'] == 'maxpool':
@@ -156,6 +158,8 @@ class LSTM(nn.Module):
             debug_output[f"stack_{stack_idx}_{piece_idx}_maxpool"] = cur_stack_x
           if self.dropout > 0.0:
             cur_stack_x = nn.Dropout(rate=self.dropout, deterministic=not train)(cur_stack_x)
+          if self.batch_norm:
+            cur_stack_out = nn.BatchNorm(use_running_average=not train)(cur_stack_x) 
           cur_stack_out = cur_stack_x
         elif piece['type'] == 'lstm':
           dim = int(piece['ch'])
@@ -189,6 +193,8 @@ class LSTM(nn.Module):
 
       x = nn.Dense(features=dim)(x)
       debug_output[f'dense_{dense_idx}_out'] = x
+      if self.batch_norm:
+        x = nn.BatchNorm(use_running_average=not train)(x) 
       x = nn.relu(x)
       debug_output[f'dense_{dense_idx}_relu'] = x
 
