@@ -1,3 +1,8 @@
+TODO:
+* Effect of feautres
+* effect of history
+* list of best model
+
 # Wind Prediction for Lake Zurich in JAX (from Scratch)
 
 Wind/Gust Speed and Direction | LSTM and Dense Activations during Training
@@ -16,7 +21,7 @@ Section|Description
 [Experimental Setup](#experimental-setup) | [Effect of features](#effect-of-features), [Effect of look-back window](#effect-of-look-back-window), [Effect of available training data](#effect-of-available-training-data)
 [Results](#results) | Summary of results
 [Debugging](#debugging) | Visualizing Activations and Gradients
-[Discussion](#discussion) | Summary
+[Conclusion](#discussion) | Conclusion
 
 # Overview
 
@@ -273,8 +278,37 @@ layers, and in the CNN layers. In-between the LSTM layers, I don't put them. WHY
 
 ## Effect of features
 
+Using the model structure `[[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}]`, the
+following table shows how the different features affect the final performance
+of the model.
+
+Input Features   | RSME
+-----------------|--------
+`WIND_SPEED`     | 0.0382
++`GUST_SPEED`   | 0.0374
++`AIR_PRESSURE` | 0.0370
++`AIR_TEMP`     | 0.0362
++`WIND_DIR`     | 0.0362
++`HOUR`         | 0.0360
++`MONTH`        | 0.0360
+`HOUR` `MONTH` as static features | 0.0359
+
+The last entry shows the results in which the `HOUR` and `MONTH` features are
+not fed as time dependent features, but directly as static features into the
+dense layers.
+
 ## Effect of look-back window
-...
+
+`[I{fr:-H,to:0};L{ch:30}]];[D{d:40};D{d:40}]`
+
+History | RSME
+--------|-----
+1       | 0.0372
+2       | 0.0367
+4       | 0.0364
+8       | 0.0362
+16      | 0.0360
+32      | 0.0359
 
 ## Effect of available training data
 
@@ -318,20 +352,47 @@ bit worse. Always predicting zero is the worst.
 
 ## Neural Architectures
 
-TODO: NUMBERS ARE OLD!
+Here are the best results obtained by evaluating various model architectures as
+listed in `./eval-arch.sh`.
 
-Architecture | RMSE 
----|---
-[[I{fr:-64,to:0}]];[D{d:20};D{d:20}] | 0.0370
-[[I{fr:-128,to:0};L{ch:30}L{ch:30}]];[D{d:40};D{d:40}] | 0.0367
-[[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}] | 0.0366
-[[I{fr:-128,to:0};L{ch:30}]];[D{d:40};D{d:40}] | 0.0365
+Run     | RMSE | Architecture | Dropout
+--------|------|--------------|--------
+0dcb67eb|0.0359|[[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}]|false
+6865e834|0.0359|[[I{fr:-256,to:0};L{ch:30}]];[D{d:40};D{d:40}]|false
+79e0c7af|0.0359|[[I{fr:-256,to:0};M{w:4};L{ch:30}];[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}]|false
+0c6238c2|0.036|[[I{fr:-64,to:0};L{ch:30}];[I{fr:-256,to:0};L{ch:30}]];[D{d:40};D{d:40}]|false
+0d0dacea|0.036|[[I{fr:-256,to:0};L{ch:30};L{ch:30}]];[D{d:40};D{d:40}]|false
+315ad7b4|0.036|[[I{fr:-256,to:0};L{ch:10};L{ch:10};L{ch:10}]];[D{d:40};D{d:40}]|false
+440867bf|0.036|[[I{fr:-64,to:0};L{ch:30};L{ch:30}]];[D{d:40};D{d:40}]|false
+571fb5cf|0.036|[[I{fr:-64,to:0};L{ch:30}];[I{fr:-256,to:0};L{ch:30}]];[D{d:40};D{d:40}]|true
+9b937108|0.036|[[I{fr:-256,to:0};M{w:2};L{ch:30}];[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}]|false
+1a7b3ddb|0.0361|[[I{fr:-256,to:0};M{w:2};L{ch:30}];[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}]|true
+4c31919c|0.0361|[[I{fr:-32,to:0}]];[D{d:40};D{d:40}]|false
+528573cf|0.0361|[[I{fr:-256,to:0};M{w:4};L{ch:30}];[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}]|true
+9a5839bb|0.0361|[[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}]|true
+bd4af8e2|0.0361|[[I{fr:-32,to:0}]];[D{d:40};D{d:40}]|true
+fec09d3c|0.0361|[[I{fr:-64,to:0};C{k:8,ch:16};C{k:8,ch:32};L{ch:10};L{ch:10}]];[D{d:20};D{d:20}]|false
+0de00f49|0.0362|[[I{fr:-256,to:0};L{ch:30};L{ch:30};L{ch:30}]];[D{d:40};D{d:40}]|false
+31fda887|0.0362|[[I{fr:-64,to:0}]];[D{d:40};D{d:40}]|false
+34f243cf|0.0362|[[I{fr:-64,to:0}]];[D{d:40};D{d:40}]|true
+4c97c7e0|0.0362|[[I{fr:-256,to:0};L{ch:30}]];[D{d:40};D{d:40}]|true
+4fef08f6|0.0362|[[I{fr:-32,to:0}]];[D{d:20};D{d:20}]|true
+5b5eeb49|0.0362|[[I{fr:-64,to:0};C{k:8,ch:16};C{k:8,ch:32};L{ch:10};L{ch:10}]];[D{d:20};D{d:20}]|true
+64090e5a|0.0363|[[I{fr:-256,to:0};L{ch:30};L{ch:30}]];[D{d:40};D{d:40}]|true
+7bbde554|0.0363|[[I{fr:-32,to:0}]];[D{d:20};D{d:20}]|false
+c02aa14d|0.0363|[[I{fr:-64,to:0};L{ch:30};L{ch:30}]];[D{d:40};D{d:40}]|true
+007f1e65|0.0364|[[I{fr:-256,to:0};L{ch:10};L{ch:10};L{ch:10}]];[D{d:40};D{d:40}]|true
+07a7ece9|0.0364|[[I{fr:-256,to:0};L{ch:30};L{ch:30};L{ch:30}]];[D{d:40};D{d:40}]|true
+23e53098|0.0364|[[I{fr:-64,to:0}]];[D{d:20};D{d:20}]|true
+dd4b7fb7|0.0364|[[I{fr:-64,to:0}]];[D{d:20};D{d:20}]|false
+133343f1|0.0365|[[I{fr:-64,to:0};C{k:8,ch:16};C{k:8,ch:32}]];[D{d:20};D{d:20}]|false
+7d8736dd|0.0365|[[I{fr:-64,to:0};C{k:8,ch:16};C{k:8,ch:32}]];[D{d:20};D{d:20}]|true
+
+# Debugging
+
+# Conclusion
 
 * Dense is actually quite ok.
 * CNNs don't work very well.
 * LSTM is best.
 * I could not find any improvements by combining CNNs with LSTMs.
-
-# Debugging
-
-# Discussion
