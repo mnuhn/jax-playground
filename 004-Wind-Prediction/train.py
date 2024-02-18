@@ -65,9 +65,13 @@ p.add_argument('--loss_fac', type=float, default=1.0)
 p.add_argument('--model_name', type=str, default=None)
 p = p.parse_args()
 
+
 def params_hash(history_len, history_feature_cnt):
   debug_strs = [f"histlen{history_len}", f"histfeats{history_feature_cnt}"]
-  skip = ['debug_every_percent', 'log_dir', 'model_name', 'dry_run', 'tensorboard', 'draw_every_percent', 'png']
+  skip = [
+      'debug_every_percent', 'log_dir', 'model_name', 'dry_run', 'tensorboard',
+      'draw_every_percent', 'png'
+  ]
 
   for arg in vars(p):
     if arg in skip:
@@ -79,6 +83,7 @@ def params_hash(history_len, history_feature_cnt):
   sha_1 = hashlib.sha1()
   sha_1.update(debug_str.encode('utf8'))
   return sha_1.hexdigest()[:8]
+
 
 print("Loading data from", p.data)
 
@@ -92,18 +97,20 @@ with np.load(p.data, mmap_mode=None) as data:
     Y = np.expand_dims(Y, 2)
 
   if p.test_examples == 0:
-    XT = data['x_test'][:,:,:]
-    YT = data['y_test'][:,:,:]
+    XT = data['x_test'][:, :, :]
+    YT = data['y_test'][:, :, :]
   else:
-    XT = data['x_test'][:p.test_examples,:,:]
-    YT = data['y_test'][:p.test_examples,:,:]
+    XT = data['x_test'][:p.test_examples, :, :]
+    YT = data['y_test'][:p.test_examples, :, :]
 
   print(f"Training examples: {X.shape[0]}")
   print(f"Test examples: {XT.shape[0]}")
 
   if p.train_examples_percent < 100.0:
     num_train_examples = int(X.shape[0] * p.train_examples_percent / 100.0)
-    print(f"Reducing training data size to {num_train_examples} ({p.train_examples_percent}%)")
+    print(
+        f"Reducing training data size to {num_train_examples} ({p.train_examples_percent}%)"
+    )
     X = X[:num_train_examples, :, :]
     Y = Y[:num_train_examples, :, :]
 
@@ -138,17 +145,17 @@ if p.model == "lstm":
   model_arch = lstm.parse_arch(p.model_arch)
   assert len(model_arch) == 2
   m = lstm.LSTM(
-          model_arch=model_arch,
-          predictions=predictions,
-          features_per_prediction=predict_feature_cnt,
-          dropout=p.dropout,
-          nonlstm_features=p.nonconv_features,
-          batch_norm=p.batch_norm,
-          )
+      model_arch=model_arch,
+      predictions=predictions,
+      features_per_prediction=predict_feature_cnt,
+      dropout=p.dropout,
+      nonlstm_features=p.nonconv_features,
+      batch_norm=p.batch_norm,
+  )
 
 assert m
 
-batcher = datalib.getbatch(X,Y,p.bs)
+batcher = datalib.getbatch(X, Y, p.bs)
 x_batch, y_batch = next(batcher)
 
 root_key = jax.random.key(seed=0)
@@ -168,49 +175,64 @@ if p.tensorboard:
 else:
   summary_writer = None
 
+
 class TrainState(train_state.TrainState):
   batch_stats: any
 
-state = TrainState.create(
-  apply_fn = m.apply,
-  params = params,
-  batch_stats = batch_stats,
-  tx = optax.adam(learning_rate=p.lr)
-)
+
+state = TrainState.create(apply_fn=m.apply,
+                          params=params,
+                          batch_stats=batch_stats,
+                          tx=optax.adam(learning_rate=p.lr))
+
 
 def scaled_loss(preds, y, non_first_fac):
-  loss = (preds-y)**2
+  loss = (preds - y)**2
   #loss = jaxopt.loss.huber_loss(target=y, pred=preds, delta=0.2)
   # Downscale weight of non-primary features.
-  loss = loss.at[:,:,1:].set(loss[:,:,1:]*non_first_fac)
-  loss = jnp.mean(jnp.sum(loss,axis=2))
+  loss = loss.at[:, :, 1:].set(loss[:, :, 1:] * non_first_fac)
+  loss = jnp.mean(jnp.sum(loss, axis=2))
   return loss
+
 
 @jax.jit
 def train_step(state: TrainState, x, y):
+
   def loss_fn(params):
     if p.batch_norm and p.dropout > 0.0:
-      preds, updates = state.apply_fn({
-          'params': params,
-          'batch_stats': state.batch_stats,
-          }, x,train=True, rngs={'dropout': dropout_key}, mutable=['batch_stats'])
+      preds, updates = state.apply_fn(
+          {
+              'params': params,
+              'batch_stats': state.batch_stats,
+          },
+          x,
+          train=True,
+          rngs={'dropout': dropout_key},
+          mutable=['batch_stats'])
       loss = scaled_loss(preds, y, p.loss_fac)
       return loss, (preds, updates)
     elif p.batch_norm:
-      preds, updates = state.apply_fn({
-          'params': params,
-          'batch_stats': state.batch_stats,
-          }, x,train=True, mutable=['batch_stats'])
+      preds, updates = state.apply_fn(
+          {
+              'params': params,
+              'batch_stats': state.batch_stats,
+          },
+          x,
+          train=True,
+          mutable=['batch_stats'])
       loss = scaled_loss(preds, y, p.loss_fac)
       return loss, (preds, updates)
     elif p.dropout > 0.0:
       preds = state.apply_fn({
           'params': params,
-          }, x,train=True, rngs={'dropout': dropout_key})
+      },
+                             x,
+                             train=True,
+                             rngs={'dropout': dropout_key})
       loss = scaled_loss(preds, y, p.loss_fac)
-      return loss, (preds, )
+      return loss, (preds,)
     else:
-      preds = state.apply_fn({'params': params}, x,train=True)
+      preds = state.apply_fn({'params': params}, x, train=True)
       loss = scaled_loss(preds, y, p.loss_fac)
       return loss, (preds,)
 
@@ -224,15 +246,27 @@ def train_step(state: TrainState, x, y):
     state = state.replace(batch_stats=updates['batch_stats'])
   return state, cur_train_loss, grads
 
+
 #@jax.jit
 def eval_step(state: TrainState, x, y):
   if p.batch_norm:
-    preds, debug = state.apply_fn({'params': state.params, 'batch_stats': state.batch_stats}, x=x, train=False, debug=True)
+    preds, debug = state.apply_fn(
+        {
+            'params': state.params,
+            'batch_stats': state.batch_stats
+        },
+        x=x,
+        train=False,
+        debug=True)
   else:
-    preds, debug = state.apply_fn({'params': state.params}, x=x, train=False, debug=True)
+    preds, debug = state.apply_fn({'params': state.params},
+                                  x=x,
+                                  train=False,
+                                  debug=True)
 
-  loss = jnp.mean((preds[:,:,0]-y[:,:,0])**2)
+  loss = jnp.mean((preds[:, :, 0] - y[:, :, 0])**2)
   return state, loss, debug
+
 
 examples = X.shape[0]
 iters = int(p.epochs * (examples / p.bs))
@@ -248,17 +282,18 @@ draw_every_iters = int(int(iters / 100.0) * p.draw_every_percent)
 eval_loss = 0.0
 
 if summary_writer:
-  summary_writer.hparams(hparams = {
-      'batch_size': int(p.bs),
-      'history_feature_cnt': int(history_feature_cnt),
-      'history_len': int(history_len),
-      'predict_len': int(predict_len),
-      'batch_norm': bool(p.batch_norm),
-      'learning_rate': p.lr,
-      'dropout': float(p.dropout),
-      'model': p.model,
-      'arch': p.model_arch,
-      'training_examples_percent': p.train_examples_percent,
+  summary_writer.hparams(
+      hparams={
+          'batch_size': int(p.bs),
+          'history_feature_cnt': int(history_feature_cnt),
+          'history_len': int(history_len),
+          'predict_len': int(predict_len),
+          'batch_norm': bool(p.batch_norm),
+          'learning_rate': p.lr,
+          'dropout': float(p.dropout),
+          'model': p.model,
+          'arch': p.model_arch,
+          'training_examples_percent': p.train_examples_percent,
       })
 
 for step in pbar:
@@ -266,25 +301,28 @@ for step in pbar:
     break
   (x, y) = next(batcher)
   state, train_loss, grads = train_step(state, x, y)
-  train_loss = train_loss ** 0.5
+  train_loss = train_loss**0.5
 
   if step > 0 and step % every_iters == 0:
     _, eval_loss, acts = eval_step(state, XT, YT)
-    eval_loss = eval_loss ** 0.5
+    eval_loss = eval_loss**0.5
     if summary_writer:
       summary_writer.scalar('eval_loss', eval_loss, step)
 
       grads_flat, _ = jax.tree_util.tree_flatten_with_path(grads)
       for key_path, value in grads_flat:
-        summary_writer.histogram(f"zzz-debug:Gradient{jax.tree_util.keystr(key_path)}",  value, step)
+        summary_writer.histogram(
+            f"zzz-debug:Gradient{jax.tree_util.keystr(key_path)}", value, step)
 
       acts_flat, _ = jax.tree_util.tree_flatten_with_path(acts)
       for key_path, value in acts_flat:
-        summary_writer.histogram(f"zzz-debug:Activation{jax.tree_util.keystr(key_path)}",  value, step)
+        summary_writer.histogram(
+            f"zzz-debug:Activation{jax.tree_util.keystr(key_path)}", value,
+            step)
 
     if step > 0 and p.draw and step % draw_every_iters == 0:
       images = []
-      for j in range(0,10):
+      for j in range(0, 10):
         v = Visualizer()
         acts["truth"] = YT
         v.draw_dict(acts, num=j, step=step)
@@ -300,7 +338,8 @@ for step in pbar:
 
   if summary_writer:
     summary_writer.scalar('train_loss', train_loss, step)
-  pbar.set_description(f"train_loss={train_loss:.06f} eval_loss={eval_loss:.06f}")
+  pbar.set_description(
+      f"train_loss={train_loss:.06f} eval_loss={eval_loss:.06f}")
 
 if summary_writer:
   summary_writer.flush()

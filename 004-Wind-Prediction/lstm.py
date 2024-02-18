@@ -14,6 +14,7 @@ from visualizer import Visualizer
 # * D: dense layer - d: dimension
 # * M: max pool layer - w: width
 
+
 def parse_layer_details(char, details_str):
   print(f"parsing {details_str}")
   details = {}
@@ -34,6 +35,7 @@ def parse_layer_details(char, details_str):
     details[key] = int(value)
   return details
 
+
 def parse_arch(encoded_str):
   stack = []
   current_group = []
@@ -49,7 +51,7 @@ def parse_arch(encoded_str):
 
     elif char in ['I', 'C', 'L', 'M', 'D']:  # Layer indicator
       j = encoded_str.find('}', i + 1)
-      layer_details_str = encoded_str[i+2:j]
+      layer_details_str = encoded_str[i + 2:j]
       layer_details = parse_layer_details(char, layer_details_str)
 
       current_group.append(layer_details)
@@ -68,9 +70,10 @@ def parse_arch(encoded_str):
       i += 1
 
   if stack:
-      raise ValueError("Unmatched brackets in the input string.")
+    raise ValueError("Unmatched brackets in the input string.")
 
   return current_group
+
 
 class LSTM(nn.Module):
   predictions: int
@@ -84,30 +87,33 @@ class LSTM(nn.Module):
     pass
 
   @nn.compact
-  def __call__(self, x, train: bool, debug:bool = False):
+  def __call__(self, x, train: bool, debug: bool = False):
     debug_output = {}
 
     if debug:
       debug_output["input"] = x
 
     if self.nonlstm_features > 0:
-      static_features = x[:,-1,-self.nonlstm_features:]
-      x = x[:,:,:-self.nonlstm_features]
+      static_features = x[:, -1, -self.nonlstm_features:]
+      x = x[:, :, :-self.nonlstm_features]
 
       if debug:
         debug_output["static_features"] = static_features
 
     def lstm_layer(x, dim):
       cell = nn.OptimizedLSTMCell(dim)
+
       def body_fn(cell, carry, x):
         return cell(carry, x)
-      scan = nn.scan(
-        body_fn, variable_broadcast="params",
-        split_rngs={"params": False}, in_axes=1, out_axes=1)
 
-      input_shape =  x[:, 0, :].shape
-      carry = cell.initialize_carry(
-        jax.random.key(0), input_shape)
+      scan = nn.scan(body_fn,
+                     variable_broadcast="params",
+                     split_rngs={"params": False},
+                     in_axes=1,
+                     out_axes=1)
+
+      input_shape = x[:, 0, :].shape
+      carry = cell.initialize_carry(jax.random.key(0), input_shape)
       carry, x = scan(cell, carry, x)
 
       return x
@@ -142,25 +148,33 @@ class LSTM(nn.Module):
           kernel_size = int(piece['k'])
           assert channels > 0
           assert kernel_size > 0
-          cur_stack_x = nn.Conv(features=channels, kernel_size=(kernel_size,), padding='SAME')(cur_stack_x)
+          cur_stack_x = nn.Conv(features=channels,
+                                kernel_size=(kernel_size,),
+                                padding='SAME')(cur_stack_x)
           if debug:
             debug_output[f"stack_{stack_idx}_{piece_idx}_conv"] = cur_stack_x
           if self.dropout > 0.0:
-            cur_stack_x = nn.Dropout(rate=self.dropout, deterministic=not train)(cur_stack_x)
+            cur_stack_x = nn.Dropout(rate=self.dropout,
+                                     deterministic=not train)(cur_stack_x)
           if self.batch_norm:
-            cur_stack_out = nn.BatchNorm(use_running_average=not train)(cur_stack_x) 
+            cur_stack_out = nn.BatchNorm(
+                use_running_average=not train)(cur_stack_x)
           cur_stack_x = nn.relu(cur_stack_x)
           cur_stack_out = cur_stack_x
         elif piece['type'] == 'maxpool':
           width = int(piece['w'])
           assert width > 1
-          cur_stack_x = nn.max_pool(cur_stack_x, window_shape=(width,), strides=(width,))
+          cur_stack_x = nn.max_pool(cur_stack_x,
+                                    window_shape=(width,),
+                                    strides=(width,))
           if debug:
             debug_output[f"stack_{stack_idx}_{piece_idx}_maxpool"] = cur_stack_x
           if self.dropout > 0.0:
-            cur_stack_x = nn.Dropout(rate=self.dropout, deterministic=not train)(cur_stack_x)
+            cur_stack_x = nn.Dropout(rate=self.dropout,
+                                     deterministic=not train)(cur_stack_x)
           if self.batch_norm:
-            cur_stack_out = nn.BatchNorm(use_running_average=not train)(cur_stack_x) 
+            cur_stack_out = nn.BatchNorm(
+                use_running_average=not train)(cur_stack_x)
           cur_stack_out = cur_stack_x
         elif piece['type'] == 'lstm':
           dim = int(piece['ch'])
@@ -169,7 +183,8 @@ class LSTM(nn.Module):
           if debug:
             debug_output[f"stack_{stack_idx}_{piece_idx}_lstm"] = cur_stack_x
           if self.dropout > 0.0:
-            cur_stack_x = nn.Dropout(rate=self.dropout, deterministic=not train)(cur_stack_x)
+            cur_stack_x = nn.Dropout(rate=self.dropout,
+                                     deterministic=not train)(cur_stack_x)
           cur_stack_out = cur_stack_x[:, -1, :]
         else:
           assert False
@@ -195,15 +210,16 @@ class LSTM(nn.Module):
       x = nn.Dense(features=dim)(x)
       debug_output[f'dense_{dense_idx}_out'] = x
       if self.batch_norm:
-        x = nn.BatchNorm(use_running_average=not train)(x) 
+        x = nn.BatchNorm(use_running_average=not train)(x)
       x = nn.relu(x)
       debug_output[f'dense_{dense_idx}_relu'] = x
 
       if self.dropout > 0.0:
         x = nn.Dropout(rate=self.dropout, deterministic=not train)(x)
-    
+
     # Final Layer
-    x = nn.Dense(features=self.predictions*self.features_per_prediction, kernel_init=initializers.glorot_uniform())(x)
+    x = nn.Dense(features=self.predictions * self.features_per_prediction,
+                 kernel_init=initializers.glorot_uniform())(x)
     x = x.reshape((-1, self.predictions, self.features_per_prediction))
     x = nn.sigmoid(x)
 
@@ -215,8 +231,7 @@ class LSTM(nn.Module):
 
     return x
 
-
   def loss(self, params, x, y):
-    p = self.apply(params,x)
-    r = jnp.mean((p-y)**2)
+    p = self.apply(params, x)
+    r = jnp.mean((p - y)**2)
     return r

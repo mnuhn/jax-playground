@@ -6,10 +6,12 @@ import argparse
 import os
 import preprocess
 
+
 def file_doesnt_exist(fn):
   if os.path.exists(fn):
     raise argparse.ArgumentTypeError(f"File '{fn}' already exists.")
   return fn
+
 
 # TODO:
 # * Docstrings
@@ -24,12 +26,26 @@ parser.add_argument('--test_year', type=int, default=2023)
 parser.add_argument('--history', type=int, default=257)
 parser.add_argument('--future', type=int, default=128)
 parser.add_argument('--copy', type=bool, default=False)
-parser.add_argument('--history_features', type=str, default="wind_speed,gust_speed,air_pressure,air_temp,sin_wind_dir,cos_wind_dir,sin_hour,cos_hour")
+parser.add_argument(
+    '--history_features',
+    type=str,
+    default=
+    "wind_speed,gust_speed,air_pressure,air_temp,sin_wind_dir,cos_wind_dir,sin_hour,cos_hour"
+)
 parser.add_argument('--predict_features', type=str, default='wind_speed')
-parser.add_argument('--output_range', type=preprocess.parse_output_range, default='ZERO_TO_ONE')
+parser.add_argument('--output_range',
+                    type=preprocess.parse_output_range,
+                    default='ZERO_TO_ONE')
 args = parser.parse_args()
 
-def generate_examples(fns, history, predictions, history_features, predict_features, test_year=args.test_year, permute=True):
+
+def generate_examples(fns,
+                      history,
+                      predictions,
+                      history_features,
+                      predict_features,
+                      test_year=args.test_year,
+                      permute=True):
   data = None
 
   for fn in fns:
@@ -49,25 +65,28 @@ def generate_examples(fns, history, predictions, history_features, predict_featu
   data = preprocess.preprocess_features(data, args.output_range)
   data_size = len(data)
 
-
   # Pre-allocate data.
-  X_ALL = np.zeros((data_size - history, history, data.shape[1]), dtype=np.float32)
-  Y_ALL = np.zeros((data_size - history, predictions, data.shape[1]), dtype=np.float32)
+  X_ALL = np.zeros((data_size - history, history, data.shape[1]),
+                   dtype=np.float32)
+  Y_ALL = np.zeros((data_size - history, predictions, data.shape[1]),
+                   dtype=np.float32)
 
   out_idx = 0
   skipped = 0
   for i in tqdm(range(history, data_size - predictions)):
-    if np.sum(data[i-history:i, preprocess.GAP]) > 0:
+    if np.sum(data[i - history:i, preprocess.GAP]) > 0:
       skipped += 1
       continue
 
-    X_ALL[out_idx,:] = data[i-history:i,:]
+    X_ALL[out_idx, :] = data[i - history:i, :]
     if args.copy:
       print("WARNING: THIS GENERATES DATA WITH OVERLAPPING HISTORY AND PREDS")
       print("WARNING: THIS GENERATES DATA WITH OVERLAPPING HISTORY AND PREDS")
-      Y_ALL[out_idx,:] = np.squeeze(data[i-history:i-history+predictions,:]) # just windspeed
+      Y_ALL[out_idx, :] = np.squeeze(data[i - history:i - history +
+                                          predictions, :])  # just windspeed
     else:
-      Y_ALL[out_idx,:] = np.squeeze(data[i:i+predictions,:]) # just windspeed
+      Y_ALL[out_idx, :] = np.squeeze(data[i:i +
+                                          predictions, :])  # just windspeed
 
     out_idx += 1
 
@@ -89,8 +108,8 @@ def generate_examples(fns, history, predictions, history_features, predict_featu
 
   X_ALL = X_ALL[:, :, history_columns]
   Y_ALL = Y_ALL[:, :, predict_columns]
-  X  = X_ALL[train_mask, :, :]
-  Y  = Y_ALL[train_mask, :, :]
+  X = X_ALL[train_mask, :, :]
+  Y = Y_ALL[train_mask, :, :]
   XT = X_ALL[test_mask, :, :]
   YT = Y_ALL[test_mask, :, :]
 
@@ -107,8 +126,8 @@ def generate_examples(fns, history, predictions, history_features, predict_featu
     XT = XT[xt_perm]
     YT = YT[xt_perm]
 
-  print("Min X:", np.min(X, axis=(0,1)))
-  print("Max X:", np.max(X, axis=(0,1)))
+  print("Min X:", np.min(X, axis=(0, 1)))
+  print("Max X:", np.max(X, axis=(0, 1)))
 
   np.savez(args.output_file, x_train=X, y_train=Y, x_test=XT, y_test=YT)
 

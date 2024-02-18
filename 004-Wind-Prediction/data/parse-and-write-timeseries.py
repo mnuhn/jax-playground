@@ -7,21 +7,28 @@ from tqdm import tqdm
 import argparse
 import os
 
+
 def file_doesnt_exist(fn):
   if os.path.exists(fn):
     raise argparse.ArgumentTypeError(f"File '{fn}' already exists.")
   return fn
 
+
 parser = argparse.ArgumentParser(description="Process the location option.")
-parser.add_argument("--location", type=str, choices=["tiefenbrunnen", "mythenquai"], required=True)
+parser.add_argument("--location",
+                    type=str,
+                    choices=["tiefenbrunnen", "mythenquai"],
+                    required=True)
 parser.add_argument("--output_file", type=file_doesnt_exist, required=True)
 args = parser.parse_args()
 
 DATE_FORMAT = "%d.%m.%Y %H:%M:%S"
 
-FIELD_NAMES = ["date", "airtemp", "humidity", "gust_speed", "wind_speed",
-               "wind_strength", "wind_dir", "wind_chill", "water_temp",
-               "air_pressure", "dew_point"]
+FIELD_NAMES = [
+    "date", "airtemp", "humidity", "gust_speed", "wind_speed", "wind_strength",
+    "wind_dir", "wind_chill", "water_temp", "air_pressure", "dew_point"
+]
+
 
 def extract_ym(fn):
   fn = fn.split("/")[-1]
@@ -31,11 +38,12 @@ def extract_ym(fn):
 
   return year, month
 
+
 def parse_html(fn):
   data = []
 
   f = io.open(fn, encoding="utf-8", errors='replace')
-  soup = BeautifulSoup(f,features="lxml" )
+  soup = BeautifulSoup(f, features="lxml")
   tables = soup.find_all('table')
   table = tables[1]
   rows = table.find_all('tr')
@@ -48,7 +56,7 @@ def parse_html(fn):
     if not first:
       d = datetime.strptime(cells[0], DATE_FORMAT)
       cells = [d.year, d.month, d.day, d.hour, d.minute, d.second] + cells[1:]
-      for i in range(1,len(cells)):
+      for i in range(1, len(cells)):
         cells[i] = float(cells[i])
 
       if cells[0] != year:
@@ -59,6 +67,7 @@ def parse_html(fn):
       data.append(cells)
     first = False
   return data
+
 
 fns = sorted(glob.glob(f"./{args.location}/20??-??.html"))
 
