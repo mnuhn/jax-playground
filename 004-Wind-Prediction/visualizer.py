@@ -19,7 +19,7 @@ class Visualizer():
   def save(self, fn):
     self.im.save(fn)
 
-  def draw_dict(self, debug, num):
+  def draw_dict(self, debug, num, step):
 
     def scale(p, minimum=None, maximum=None):
       if minimum == None:
@@ -65,6 +65,9 @@ class Visualizer():
         x0 = 0
         y0 = y1 + self.box_width
 
+    self.id.text((0, y_max), f"step: {step}", font = font, fill=(255, 255, 255, 128))
+    text_box = font.getbbox(f"step: {step}")
+    y_max += text_box[3]
     self.im = self.im.crop((0,0,x_max,y_max))
 
 

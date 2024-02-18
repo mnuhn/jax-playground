@@ -286,7 +286,7 @@ for step in pbar:
       for j in range(0,10):
         v = Visualizer()
         acts["truth"] = YT
-        v.draw_dict(acts, num=j)
+        v.draw_dict(acts, num=j, step=step)
         if p.png:
           v.save(f"./png/{p.prefix}-test{i:05d}-{j:03d}.png")
         image = tf.image.decode_png(v.byte_array(), channels=4)
