@@ -26,7 +26,7 @@ class Visualizer():
         minimum = np.min(p)
       if maximum == None:
         maximum = np.max(p)
-      return (p - minimum) / (maximum-minimum+0.001) * 255
+      return np.clip((p - minimum) / (maximum-minimum+0.0001) * 255, 0, 255)
 
     y0 = 0
     x0 = 0
@@ -47,7 +47,7 @@ class Visualizer():
         print(f"{k}: error with {to_draw} due to shape")
         continue
 
-      to_draw = scale(to_draw)
+      to_draw = scale(to_draw, minimum=None, maximum=None)
       x1, y1 = self.box(to_draw, x0, y0)
 
       self.id.text((x1 + self.box_width, y0), k, font = font, fill=(255, 255, 255, 128))
