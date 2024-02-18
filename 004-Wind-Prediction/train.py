@@ -56,6 +56,7 @@ p.add_argument('--lr', type=float, default=0.001)
 p.add_argument('--dropout', type=float, default=0.0)
 p.add_argument('--batch_norm', type=bool, default=False)
 p.add_argument('--epochs', type=float, default=10)
+p.add_argument('--test_examples', type=float, default=10000)
 
 # Loss params.
 p.add_argument('--loss_fac', type=float, default=1.0)
@@ -89,8 +90,12 @@ with np.load(p.data, mmap_mode=None) as data:
     YT = np.expand_dims(YT, 2)
     Y = np.expand_dims(Y, 2)
 
-  XT = data['x_test'][:5000,:,:]
-  YT = data['y_test'][:5000,:,:]
+  if p.test_examples == 0:
+    XT = data['x_test'][:,:,:]
+    YT = data['y_test'][:,:,:]
+  else:
+    XT = data['x_test'][:p.test_examples,:,:]
+    YT = data['y_test'][:p.test_examples,:,:]
 
   history = X.shape[1]
   predictions = Y.shape[1]
