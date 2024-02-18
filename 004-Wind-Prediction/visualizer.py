@@ -68,6 +68,7 @@ class Visualizer():
     self.id.text((0, y_max), f"step: {step}", font = font, fill=(255, 255, 255, 128))
     text_box = font.getbbox(f"step: {step}")
     y_max += text_box[3]
+    
     self.im = self.im.crop((0,0,x_max,y_max))
 
 
