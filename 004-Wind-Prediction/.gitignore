@@ -8,3 +8,5 @@ tensorboard/
 scripts/download.sh
 tb-*/
 tb/
+*.npz
+*.npy
