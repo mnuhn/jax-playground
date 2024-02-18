@@ -6,3 +6,5 @@ timeseries.lt2023.npy
 timeseries.2023.npy
 tensorboard/
 scripts/download.sh
+tb-*/
+tb/
