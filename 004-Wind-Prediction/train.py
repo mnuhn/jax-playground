@@ -57,6 +57,7 @@ p.add_argument('--dropout', type=float, default=0.0)
 p.add_argument('--batch_norm', type=bool, default=False)
 p.add_argument('--epochs', type=float, default=10)
 p.add_argument('--test_examples', type=float, default=10000)
+p.add_argument('--train_examples_percent', type=float, default=100.0)
 
 # Loss params.
 p.add_argument('--loss_fac', type=float, default=1.0)
@@ -96,6 +97,12 @@ with np.load(p.data, mmap_mode=None) as data:
   else:
     XT = data['x_test'][:p.test_examples,:,:]
     YT = data['y_test'][:p.test_examples,:,:]
+
+  if p.train_examples_percent < 100.0:
+    num_train_examples = int(X.shape[0] * p.train_examples_percent / 100.0)
+    print(f"Reducing training data size to {num_train_examples} ({p.train_examples_percent}%)")
+    X = X[:num_train_examples, :, :]
+    Y = Y[:num_train_examples, :, :]
 
   history = X.shape[1]
   predictions = Y.shape[1]
