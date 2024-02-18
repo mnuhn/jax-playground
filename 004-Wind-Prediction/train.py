@@ -242,8 +242,8 @@ print(f"to run {p.epochs} epochs need to run {iters}.")
 
 pbar = tqdm(range(int(iters)))
 
-every_iters = int(iters / 100.0) * p.debug_every_percent
-draw_every_iters = int(iters / 100.0) * p.draw_every_percent
+every_iters = int(int(iters / 100.0) * p.debug_every_percent)
+draw_every_iters = int(int(iters / 100.0) * p.draw_every_percent)
 
 eval_loss = 0.0
 
