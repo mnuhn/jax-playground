@@ -258,6 +258,7 @@ if summary_writer:
       'dropout': float(p.dropout),
       'model': p.model,
       'arch': p.model_arch,
+      'training_examples_percent': p.train_examples_percent,
       })
 
 for step in pbar:
