@@ -90,11 +90,11 @@ class LSTM(nn.Module):
       debug_output["input"] = x
 
     if self.nonlstm_features > 0:
-      last_features = x[:,-1,-self.nonlstm_features:]
+      static_features = x[:,-1,-self.nonlstm_features:]
       x = x[:,:,:-self.nonlstm_features]
 
       if debug:
-        debug_output["last_features"] = last_features
+        debug_output["static_features"] = static_features
 
     def lstm_layer(x, dim):
       cell = nn.OptimizedLSTMCell(dim)
@@ -177,7 +177,7 @@ class LSTM(nn.Module):
     if debug:
       debug_output['stacked_outputs'] = x
 
-    x = jnp.concatenate([x, last_features], axis=1)
+    x = jnp.concatenate([x, static_features], axis=1)
 
     if debug:
       debug_output['stacked_outputs_with_static_features'] = x
