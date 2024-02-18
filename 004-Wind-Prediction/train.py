@@ -289,7 +289,8 @@ for step in pbar:
         acts["truth"] = YT
         v.draw_dict(acts, num=j, step=step)
         if p.png:
-          v.save(f"./png/{p.prefix}-test{i:05d}-{j:03d}.png")
+          os.makedirs(f"./{p.log_dir}/png/example{j:03d}/", exist_ok=True)
+          v.save(f"./{p.log_dir}/png/example{j:03d}/step{step:05d}.png")
         image = tf.image.decode_png(v.byte_array(), channels=4)
         images.append(image)
         del v
