@@ -7,7 +7,6 @@ Wind/Gust Speed and Direction | LSTM and Dense Activations during Training
 
 # Overview
 * [Intro](#intro)
-* [Task Definition](#task-definition)
 * [Preparing Wind Data](#preparing-wind-data)
 * [Model Architectures](#model-architectures)
 * [Training](#training)
@@ -16,27 +15,20 @@ Wind/Gust Speed and Direction | LSTM and Dense Activations during Training
 
 # Intro
 
-In this project, I scrape wind data for 2 weather stations at lake Zurich. The
-data is sampled at intervals of 10 minutes and has the following features:
+In this project, I train a neural network to predict the wind on lake Zurich
+based on data from 2 weather stations (Mythenquai, Tiefenbrunnen). The data is
+sampled at 10-minute intervals and has features such as `wind speed`, `wind
+direction`, `air temperature`, `air pressure`, etc (10 in total).
 
-* wind speed (m/s)
-* gust speed (m/s)
-* wind direction
-* air temperature (celsius)
-* water temperature (celsius)
-* humidity (%)
-* air pressure (hPa)
-* date/time
+The task is to predict the next `P` timesteps of `wind speed` given the past
+`H` timesteps (any of the features above). I separate train/test sets by years
+(i.e.  train on 2019-2022 and evaluate on 2023). I use the root-mean-square
+error (RMSE) between the predictions and the ground truth to evaluate the
+model. I aimed at predicting 16 timesteps (so 2h and 40mins into the future,
+which is enough for a short sailing trip on the lake).
 
-The goal is to read the past N timesteps (any observations we have) and predict
-the next M timesteps for wind speed. I separate train/test sets by years (i.e.
-train on 2019-2022 and evaluate on 2023). I use the root-mean-square error
-(RMSE) between the predictions and the ground truth to evaluate the model. I
-typically predicted 16 timesteps (so 2h and 40mins into the future, which is
-enough for a short sailing trip on the lake).
-
-I then preprocess the data (feature normalization/preprocessing, data cleanup),
-and the impact of the features, model architectures and training schemes on them.
+I scrape and preprocess the data (feature normalization, data cleanup), and the
+impact of the features, model architectures and training schemes on them.
 
 To evaluate different classes of model architectures, I implemented a small
 descriptor to represent such architectures efficiently:
