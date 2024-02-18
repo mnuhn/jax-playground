@@ -14,7 +14,6 @@ from jax import grad, jit, random
 import jax.numpy as jnp
 import optax
 from tqdm import tqdm
-import model
 import datalib
 import os
 
@@ -31,7 +30,7 @@ assert p.prediction_files
 assert p.prediction_labels
 assert len(p.prediction_files.split(',')) == len(p.prediction_labels.split(','))
 
-X, Y, XT, YT = data.get_data(p.timeseries, ["wind_speed"], history=p.history, predictions=p.predictions, permute=False)
+X, Y, XT, YT = datalib.get_data(p.timeseries, ["wind_speed"], history=p.history, predictions=p.predictions, permute=False)
 
 all_predictions = []
 for fn in p.prediction_files.split(","):
