@@ -15,6 +15,7 @@ from visualizer import Visualizer
 # * M: max pool layer - w: width
 
 def parse_layer_details(char, details_str):
+  print(f"parsing {details_str}")
   details = {}
   if char == 'I':
     details['type'] = 'input'
