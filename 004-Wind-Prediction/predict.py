@@ -12,8 +12,8 @@ from jax import grad, jit, random
 import jax.numpy as jnp
 import optax
 from tqdm import tqdm
-import data
 import model
+import datalib
 import os
 
 p = argparse.ArgumentParser(description='...')
@@ -47,7 +47,8 @@ if p.model == "lstm":
 
 assert m
 
-batcher = data.getbatch(X,Y,p.batch_size)
+
+batcher = datalib.getbatch(X,Y,p.batch_size)
 x_batch, y_batch = next(batcher)
 x_batch = x_batch[:,:,1:]
 params = m.init(jax.random.key(0), x_batch)

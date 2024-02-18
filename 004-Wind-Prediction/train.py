@@ -27,7 +27,7 @@ import argparse
 import re
 import sys
 
-import data
+import datalib
 import lstm
 
 p = argparse.ArgumentParser(description='...')
@@ -140,8 +140,7 @@ def getbatch(X,Y,batch_size):
     Y = Y[perm]
     for i in range(0, int(len(X)/batch_size)):
       yield X[i*batch_size:(i+1)*batch_size,:], Y[i*batch_size:(i+1)*batch_size]
-
-batcher = getbatch(X,Y,p.bs)
+batcher = datalib.getbatch(X,Y,p.bs)
 x_batch, y_batch = next(batcher)
 
 root_key = jax.random.key(seed=0)

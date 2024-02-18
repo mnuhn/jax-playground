@@ -14,8 +14,8 @@ from jax import grad, jit, random
 import jax.numpy as jnp
 import optax
 from tqdm import tqdm
-import data
 import model
+import datalib
 import os
 
 p = argparse.ArgumentParser(description='...')
