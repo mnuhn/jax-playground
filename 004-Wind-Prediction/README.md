@@ -5,15 +5,20 @@ Wind/Gust Speed and Direction | LSTM and Dense Activations during Training
 <img src="wind.png" width="500px"> | ![Training](training.gif)
 
 
-# Overview
-* [Intro](#intro)
-* [Preparing Wind Data](#preparing-wind-data)
-* [Model Architectures](#model-architectures)
-* [Training](#training)
-* [Debugging](#debugging)
-* [Results](#results)
+# Table of Contents
 
-# Intro
+Section|Description
+---|---
+[Overview](#overview) | A brief overview of the project, its objectives, and what it achieves
+[Data Preparation](#data-preparation) | Detail the data collection, cleaning, and preprocessing steps
+[Model Architectures](#model-architectures) | [Baseline Models](#baselines), [Neural Network Models](#neural-architectures), Regularization Techniques
+[Training Process](#training) | Dropout, Early Stopping
+[Experimental Setup](#experimental-setup) | [Effect of features](#effect-of-features), [Effect of look-back window](#effect-of-look-back-window), [Effect of available training data](#effect-of-available-training-data)
+[Results](#results) | Summary of results
+[Debugging](#debugging) | Visualizing Activations and Gradients
+[Discussion](#discussion) | Summary
+
+# Overview
 
 In this project, I train a neural network to predict the wind on lake Zurich
 based on data from 2 weather stations (Mythenquai, Tiefenbrunnen). The data is
@@ -76,7 +81,7 @@ Besides for the pure fun of looking at it, I used the above visualizations
 mostly to make sure the code is implemented correctly - and to check for things
 like exploding or vanishing gradients.
 
-# Details on Preparing the Data
+# Data Preparation
 
 Please see the scripts to download and prepare the wind data in `./data/`. The
 scripts are missing the URL of the source on purpose, as the weather stations
@@ -214,31 +219,20 @@ python3 generate-examples.py \
   --future=16
 ```
 
+
 # Model Architectures
 
 ## Baselines
 
-To start, I implement some very basic baselines and evaluate them:
+I implement some very basic baselines and evaluate them:
+
 * `last_value` takes the last value of the wind speed for all predictions
 * `const_value_x` takes `x` for all predictions
 * `mean_value` takes the mean of the last `H` timesteps for all predictions
 
-Here are the results for `both.clean.small.8feature.16h.examples.npz`:
+The results can be seen in the [Results](#results) section.
 
-History | Algorithm        | RMSE
---------|------------------|-------
-n/a     |       last_value | 0.0436
-16      |       mean_value | 0.0436
-32      |       mean_value | 0.0450
-n/a     | const_value_0.07 | 0.0575
-n/a     | const_value_0.00 | 0.0876
-
-So just repeating the last wind speed for the next 16 timesteps is the best
-(out of these simple baselines). Using the mean value over the last 16 or 32
-timesteps is worse. Always predicting 0.07 (which translates to 1.75m/s) is a
-bit worse. Always predicting zero is the worst.
-
-## Exploring Model Architectures
+## Neural Architectures
 
 As mentioned in the intro, I implement a mini language to describe the model
 architectures.
@@ -261,6 +255,27 @@ The above language allows things like:
 I ran experiments with various combinations of input features, max pooling,
 LSTM layers and CNNs.
 
+# Training
+
+* Dropout: I applied dropout to all layers. I also tried only applying it to
+  LSTM layers. However, any use of dropout made the results worse.
+
+* Batchnorm: I can clearly see the effect of batch norm: The training run
+  converges much faster. However, the final results were worse with batch norm
+  enabled. I think this is because the task is a regression problem and batch
+  norm effectively removes information from the input through the normalization
+  - which might be important information for the regression itself.
+
+WHERE DO I PUT THE BATCH NORM LAYERS. I put them between the final dense
+layers, and in the CNN layers. In-between the LSTM layers, I don't put them. WHY??
+
+# Experimental Setup
+
+## Effect of features
+
+## Effect of look-back window
+...
+
 ## Effect of available training data
 
 Using the model structure `[[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}]`, the
@@ -282,23 +297,28 @@ training data does not cause any decrease in performace. Based on this, it
 looks like collecting more data won't help much and the model might already
 exploit all available redundancies in the data for its predictions.
 
-## Effect of look-back window
+# Results
 
-## Training Techniques
+## Baselines
 
-* Dropout: I applied dropout to all layers. I also tried only applying it to
-  LSTM layers. However, any use of dropout made the results worse.
+Here are the results for `both.clean.small.8feature.16h.examples.npz`:
 
-* Batchnorm: I can clearly see the effect of batch norm: The training run
-  converges much faster. However, the final results were worse with batch norm
-  enabled. I think this is because the task is a regression problem and batch
-  norm effectively removes information from the input through the normalization
-  - which might be important information for the regression itself.
+History | Algorithm        | RMSE
+--------|------------------|-------
+n/a     |       last_value | 0.0436
+16      |       mean_value | 0.0436
+32      |       mean_value | 0.0450
+n/a     | const_value_0.07 | 0.0575
+n/a     | const_value_0.00 | 0.0876
 
-WHERE DO I PUT THE BATCH NORM LAYERS. I put them between the final dense
-layers, and in the CNN layers. In-between the LSTM layers, I don't put them. WHY??
+So just repeating the last wind speed for the next 16 timesteps is the best
+(out of these simple baselines). Using the mean value over the last 16 or 32
+timesteps is worse. Always predicting 0.07 (which translates to 1.75m/s) is a
+bit worse. Always predicting zero is the worst.
 
-## Results
+## Neural Architectures
+
+TODO: NUMBERS ARE OLD!
 
 Architecture | RMSE 
 ---|---
@@ -307,8 +327,11 @@ Architecture | RMSE
 [[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}] | 0.0366
 [[I{fr:-128,to:0};L{ch:30}]];[D{d:40};D{d:40}] | 0.0365
 
-
 * Dense is actually quite ok.
 * CNNs don't work very well.
 * LSTM is best.
 * I could not find any improvements by combining CNNs with LSTMs.
+
+# Debugging
+
+# Discussion
