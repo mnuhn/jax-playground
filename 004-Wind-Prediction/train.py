@@ -98,6 +98,9 @@ with np.load(p.data, mmap_mode=None) as data:
     XT = data['x_test'][:p.test_examples,:,:]
     YT = data['y_test'][:p.test_examples,:,:]
 
+  print(f"Training examples: {X.shape[0]}")
+  print(f"Test examples: {XT.shape[0]}")
+
   if p.train_examples_percent < 100.0:
     num_train_examples = int(X.shape[0] * p.train_examples_percent / 100.0)
     print(f"Reducing training data size to {num_train_examples} ({p.train_examples_percent}%)")
