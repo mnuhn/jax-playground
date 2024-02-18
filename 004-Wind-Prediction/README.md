@@ -49,11 +49,14 @@ Descriptor | Explanation
 
 What it does:
 * Take the last 256 time steps, max pool with width 4, and apply 1 LSTM layer (dim: 30) to it.
-* Take the last 32 time steps, and apply 1 LSTM layer (dim: 10) to it.
-* Concatenate the outputs of the final state
+* Take the last 32 time steps, and apply 1 LSTM layer (dim: 10) to it
+* Concatenate the outputs of the final states of the above LSTMs
 * Run it through 2 layers of a dense network
 
-All training runs are exported to Tensorboard
+Multiple LSTM and CNN layers can be stacked.
+
+All training runs are exported to Tensorboard:
+
 ![Tensorboard](tensorboard.png)
 
 I also export gradients, activations, and a visualization of the model
@@ -73,21 +76,22 @@ Besides for the pure fun of looking at it, I used the above visualizations
 mostly to make sure the code is implemented correctly - and to check for things
 like exploding or vanishing gradients.
 
-# Preparing Wind Data
+# Details on Preparing the Data
 
 Please see the scripts to download and prepare the wind data in `./data/`. The
-scripts are missing the URL of the source on purpose, as they don't officially
-permit scraping it.
+scripts are missing the URL of the source on purpose, as the weather stations
+don't officially permit scraping the data.
 
-## Download the HTMLs you want
+## Scraping and conversion to Numpy
+
+1. Download the HTMLs. Example: Download data from January 2017
 
 ```
-# Example: Download data from January 2017
 bash download-htmls.sh mythenquai 2017 01
 bash download-htmls.sh tiefenbrunnen 2017 01
 ```
 
-## Parse HTMLs and create numpy timeseries
+2. Parse HTMLs and create numpy timeseries
 
 ```
 python3 parse-and-write-timeseries.py \
@@ -123,11 +127,10 @@ python3 check-data.py \
   --output_file=./mythenquai.clean.npy
 ```
 
-## Feature Scaling
+## Feature scaling
 
-Data is preprocessed using `preprocess.py`. In particular, all features are
-scaled to have a range of [0,1]. For this, the following input ranges are
-scaled to [0,1]:
+In particular, all features are scaled to have a range of [0,1]. For this, the
+following input ranges are scaled to [0,1]:
 
 Feature      |  Unit |  From | To
 -------------|------:|------:|-----:
@@ -143,43 +146,44 @@ COS_MONTH    | n/a   | -1.0  | 1.0
 SIN_WIND_DIR | n/a   | -1.0  | 1.0
 COS_WIND_DIR | n/a   | -1.0  | 1.0
 
-I did use static min and max values. I guess I could also have used something
-like a `MinMax` scaler to do it automatically.
+This is done in the `preprocess.py` script.
 
-Note that I created Sine and Cosine features for "periodic" values such as hour
-of the day, month and wind direction. From my experiments, it doesn't make a
-huge difference - but I do think it makes a lot of sense to use these instead
-of the raw values (otherwise you will have "jumps" in the input features).
+Yes, I did use static min and max values. I guess I could also have used
+something like a `MinMax` scaler to do it automatically.
 
-## Generate final train and test data
+Also, note that I created Sine and Cosine features for "periodic" values such
+as hour of the day, month and wind direction. From my experiments, it doesn't
+make a huge difference - but I do think it makes a lot of sense to use these
+instead of the raw values (otherwise you will have "jumps" in the input
+features).
+
+## Train and test splits
 
 The `generate-examples.py` tool generates the final train and test data. It
 takes the following parameters:
+* Features: A comma-separated list of features to include as input `X`
+* History: Length of history for each example in `X`
+* Predictions: Number of predictions to include in `Y`
 
-Parameter   | Description
-------------|-----------------------------------------------------------
-Features    | A comma-separated list of features to include as input `X`
-History     | Length of history for each example in `X`
-Predictions | Number of predictions to include in `Y`
+With `H` timesteps of history, and `P` timesteps of predictions, and `F` input
+features, the generated data are numpy `npz` files having the following arrays:
 
-The generated data are numpy `npz` files having the following arrays:
-
-Array | Shape                | Description
-------|----------------------|-----------------------------------
-X     | [N,History,Features] | N is the number of train examples
-Y     | [N,Predictions]      |
-XT    | [M,History,Features] | M is the number of test examples
-YT    | [M,Predictions]      |
+Array | Shape     | Description
+------|-----------|-----------------------------------
+`X`   | `[N,H,F]` | `N` is the number of train examples
+`Y`   | `[N,P]`   | 
+`XT`  | `[M,H,F]` | `M` is the number of test examples
+`YT`  | `[M,P]`   |
 
 Only examples that have no "gap" in the input training data are used as
 examples: if there is 1 missing value in the middle of the day, no examples
 that have some overlap with with that point in time will be output.
 
 Note that the generate data is quite redundant, as can be seen in this example
-(with Features=1, History=4, Future=2). Unnecessary nesting is removed:
+(with `F=1`, `H=4`, `P=2`). Unnecessary nesting is removed:
 
-X | Y
---|---
+`X` | `Y`
+---|---
 [1, 2, 3, 4] | [5, 6]
 [2, 3, 4, 5] | [6, 7]
 [3, 4, 5, 6] | [7, 8]
@@ -188,9 +192,7 @@ X | Y
 I could also do these kinds of computations on the fly - but I preferred to
 have it persisted this way, so I could inspect and debug the data more easily.
 
-## Generate data with `history=16`, `future=16`:
-
-We call this one `both.clean.small.8feature.16h.examples.npz`:
+**Example:** Generate data with `history=16`, `future=16`:
 
 ```
 python3 generate-examples.py \
@@ -201,9 +203,7 @@ python3 generate-examples.py \
   --future=16
 ```
 
-## Generate data with `history=32`, `future=16`:
-
-We call this one `both.clean.small.8feature.32h.examples.npz`:
+**Example:** Generate data with `history=32`, `future=16`:
 
 ```
 python3 generate-examples.py \
@@ -214,24 +214,29 @@ python3 generate-examples.py \
   --future=16
 ```
 
+# Model Architectures
 
-# Models Architecture
 ## Baselines
 
 To start, I implement some very basic baselines and evaluate them:
 * `last_value` takes the last value of the wind speed for all predictions
 * `const_value_x` takes `x` for all predictions
-* `mean_value` takes the mean of the last `h` timesteps for all predictions
+* `mean_value` takes the mean of the last `H` timesteps for all predictions
 
 Here are the results for `both.clean.small.8feature.16h.examples.npz`:
 
 History | Algorithm        | RMSE
---------|------------------|-----------
-n/a     |       last_value | 0.04641434
-n/a     | const_value_0.00 | 0.09431773
-n/a     | const_value_0.07 | 0.06256304
-16      |       mean_value | 0.04707646
-32      |       mean_value | 0.04519560
+--------|------------------|--------
+n/a     |       last_value | 0.04364
+16      |       mean_value | 0.04364
+32      |       mean_value | 0.04508
+n/a     | const_value_0.07 | 0.05752
+n/a     | const_value_0.00 | 0.08766
+
+So just repeating the last wind speed for the next 16 timesteps is the best
+(out of these simple baselines). Using the mean value over the last 16 or 32
+timesteps is worse. Always predicting 0.07 (which translates to 1.75m/s) is a
+bit worse. Always predicting zero is the worst.
 
 ## Exploring Model Architectures
 
@@ -246,25 +251,62 @@ Descriptor | Explanation
 `C{ch:20, k: 16}` | Apply a CNN across the time axis to the output of the previous stage (ch: number of channels, k: size of the kernel \[time steps\])
 `D{dim:20}` | Apply a dense layer to the output of the previous stage 
 
+The above language allows things like:
+* `[I{fr:-256,to:0};M{w:2}...]` which takes a history of 256 and maxpools it to 128
+* `[C{ch:10, k:16};L{ch:20}]` which combines convolutions with an LSTM
+* `[...;L{ch:20};L{ch:20}]` which stacks multiple LSTMs
+* `[...;C{...};C{...}]` which stacks multiple CNNs
+* `...;[D{dim:20};D{dim:20}]` which defines the final dense layer
+
 I ran experiments with various combinations of input features, max pooling,
 LSTM layers and CNNs.
 
-## Exploring Training Techniques
+## Effect of available training data
 
-### Dropout
+Using the model structure `[[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}]`, the
+following table shows how the amount of available training data affects the
+resulting performance of the model on a holdout set.
 
-I applied dropout to all layers. I also tried only applying it to LSTM layers.
-However, any use of dropout made the results worse.
+Data Used   | RMSE
+------------|---------------
+100%        | 0.0359
+50%         | 0.0359
+25%         | 0.0363
+10%         | 0.0367
+5%          | 0.0373
+3%          | 0.0379
+1%          | 0.0516
 
-### Batchnorm
+It can be seen that the performance reaches a plateau: using only half of the
+training data does not cause any decrease in performace. Based on this, it
+looks like collecting more data won't help much and the model might already
+exploit all available redundancies in the data for its predictions.
 
-I can clearly see the effect of batch norm: The training run converges much
-faster. However, the final results were worse with batch norm enabled. I think
-this is because the task is a regression problem and batch norm effectively
-removes information from the input through the normalization - which might be
-important information for the regression itself.
+## Effect of look-back window
+
+## Training Techniques
+
+* Dropout: I applied dropout to all layers. I also tried only applying it to
+  LSTM layers. However, any use of dropout made the results worse.
+
+* Batchnorm: I can clearly see the effect of batch norm: The training run
+  converges much faster. However, the final results were worse with batch norm
+  enabled. I think this is because the task is a regression problem and batch
+  norm effectively removes information from the input through the normalization
+  - which might be important information for the regression itself.
+
+WHERE DO I PUT THE BATCH NORM LAYERS. I put them between the final dense
+layers, and in the CNN layers. In-between the LSTM layers, I don't put them. WHY??
 
 ## Results
+
+Architecture | RMSE 
+---|---
+[[I{fr:-64,to:0}]];[D{d:20};D{d:20}] | 0.0370
+[[I{fr:-128,to:0};L{ch:30}L{ch:30}]];[D{d:40};D{d:40}] | 0.0367
+[[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}] | 0.0366
+[[I{fr:-128,to:0};L{ch:30}]];[D{d:40};D{d:40}] | 0.0365
+
 
 * Dense is actually quite ok.
 * CNNs don't work very well.
