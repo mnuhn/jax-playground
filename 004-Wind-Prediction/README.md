@@ -1,8 +1,3 @@
-TODO:
-* Effect of feautres
-* effect of history
-* list of best model
-
 # Wind Prediction for Lake Zurich in JAX (from Scratch)
 
 Wind/Gust Speed and Direction | LSTM and Dense Activations during Training
@@ -16,11 +11,10 @@ Section|Description
 ---|---
 [Overview](#overview) | A brief overview of the project, its objectives, and what it achieves
 [Data Preparation](#data-preparation) | Detail the data collection, cleaning, and preprocessing steps
-[Model Architectures](#model-architectures) | [Baseline Models](#baselines), [Neural Network Models](#neural-architectures), Regularization Techniques
+[Model Architectures](#model-architectures) | [Baseline Models](#baselines), [Neural Network Models](#neural-architectures), Regularization Techniques, [Debugging](#debugging)
 [Training Process](#training) | Dropout, Early Stopping
-[Experimental Setup](#experimental-setup) | [Effect of features](#effect-of-features), [Effect of look-back window](#effect-of-look-back-window), [Effect of available training data](#effect-of-available-training-data)
 [Results](#results) | Summary of results
-[Debugging](#debugging) | Visualizing Activations and Gradients
+[Analysis and Discussion](#analysis-and-discussion) | [Effect of features](#effect-of-features), [Effect of look-back window](#effect-of-look-back-window), [Effect of available training data](#effect-of-available-training-data)
 [Conclusion](#discussion) | Conclusion
 
 # Overview
@@ -41,29 +35,10 @@ I scrape and preprocess the data (feature normalization, data cleanup), and the
 impact of the features, model architectures and training schemes on them.
 
 To evaluate different classes of model architectures, I implemented a small
-descriptor to represent such architectures efficiently:
-
-Descriptor | Explanation
-:--|:--
-`I{fr:-256,to:0}` | Input features from 256 time steps ago to 0
-`M{w:2}` | Max pool the output of the previous stage (w: window size)
-`L{ch:20}` | Apply LSTM to the output of the previous stage (ch: dim hidden state)
-`C{ch:20, k: 16}` | Apply a CNN across the time axis to the output of the previous stage (ch: number of channels, k: size of the kernel \[time steps\])
-`D{dim:20}` | Apply a dense layer to the output of the previous stage 
-
-**Example:**
-
-```
-[[I{fr:-256,to:0};M{w:4};L{ch:30}];[I{fr:-32,to:0};L{ch:10}]];[D{d:40};D{d:40}]
-```
-
-What it does:
-* Take the last 256 time steps, max pool with width 4, and apply 1 LSTM layer (dim: 30) to it.
-* Take the last 32 time steps, and apply 1 LSTM layer (dim: 10) to it
-* Concatenate the outputs of the final states of the above LSTMs
-* Run it through 2 layers of a dense network
-
-Multiple LSTM and CNN layers can be stacked.
+descriptor to represent such architectures efficiently. An example of such a
+descriptor is
+`[[I{fr:-256,to:0};M{w:4};L{ch:30}];[I{fr:-32,to:0};L{ch:10}]];[D{d:40};D{d:40}]`.
+See [Neural Architectures](#neural-architectures) for more details.
 
 All training runs are exported to Tensorboard:
 
@@ -75,9 +50,6 @@ architecture directly to Tensorboard for debugging purposes.
 Gradients | Activations | Model Architecture
 ---|---|---
 ![Gradients](tensorboard-gradients.png)|![Activations](tensorboard-activations.png)|![Model Architecture in Tensorboard](tensorboard-arch.png)
-
-Here is a closer look at the visualization of the model during inference:
-![Activations](activations.png)
 
 Note that I always do some special handling of "static" features (date/time),
 see `stacked_outputs_with_static_features`.
@@ -260,6 +232,30 @@ The above language allows things like:
 I ran experiments with various combinations of input features, max pooling,
 LSTM layers and CNNs.
 
+## Debugging
+
+For debugging purposes, I implemented a visualization of the neural
+architecture. For each part of the resulting Here is a closer look at the
+visualization of the model during inference for
+`[[I{fr:-256,to:0};M{w:4};L{ch:30}];[I{fr:-32,to:0};L{ch:10}]];[D{dim:40};D{dim:40}]`.
+
+![Activations](activations.png)
+
+In the picture, `stack_0_1_maxpool` corresponds to the output of
+`I{fr:-256,to:0};M{w:4}`. `stack_0_2_lstm` corresponds to the output of
+`L{ch:30}`. `stack_1_0_in` corresponds to `I{fr:-32,to:0}`, and
+`stack_1_1_lstm` is the output of `L{ch:10}`. `stacked_outputs` is the
+concatenation of final LSTM states. `stacked_outputs_with_static_features` also
+concatenates additional static features (sin and cos of hour and month). The
+entries `dense_*_*` represent the final dense layer. `prediction` corresponds
+to the final output and `truth` corresponds to the ground truth for this
+example.
+
+Note that for each array, the colors are scaled such that the minimum value
+corresponds to black and the maximum value corresponds to white. This means
+that for example for `predict` and `truth` the colors could be the same, but
+still there is a discrepancy in actual values.
+
 # Training
 
 * Dropout: I applied dropout to all layers. I also tried only applying it to
@@ -273,63 +269,6 @@ LSTM layers and CNNs.
 
 WHERE DO I PUT THE BATCH NORM LAYERS. I put them between the final dense
 layers, and in the CNN layers. In-between the LSTM layers, I don't put them. WHY??
-
-# Experimental Setup
-
-## Effect of features
-
-Using the model structure `[[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}]`, the
-following table shows how the different features affect the final performance
-of the model.
-
-Input Features   | RSME
------------------|--------
-`WIND_SPEED`     | 0.0382
-+`GUST_SPEED`   | 0.0374
-+`AIR_PRESSURE` | 0.0370
-+`AIR_TEMP`     | 0.0362
-+`WIND_DIR`     | 0.0362
-+`HOUR`         | 0.0360
-+`MONTH`        | 0.0360
-`HOUR` `MONTH` as static features | 0.0359
-
-The last entry shows the results in which the `HOUR` and `MONTH` features are
-not fed as time dependent features, but directly as static features into the
-dense layers.
-
-## Effect of look-back window
-
-`[I{fr:-H,to:0};L{ch:30}]];[D{d:40};D{d:40}]`
-
-History | RSME
---------|-----
-1       | 0.0372
-2       | 0.0367
-4       | 0.0364
-8       | 0.0362
-16      | 0.0360
-32      | 0.0359
-
-## Effect of available training data
-
-Using the model structure `[[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}]`, the
-following table shows how the amount of available training data affects the
-resulting performance of the model on a holdout set.
-
-Data Used   | RMSE
-------------|---------------
-100%        | 0.0359
-50%         | 0.0359
-25%         | 0.0363
-10%         | 0.0367
-5%          | 0.0373
-3%          | 0.0379
-1%          | 0.0516
-
-It can be seen that the performance reaches a plateau: using only half of the
-training data does not cause any decrease in performace. Based on this, it
-looks like collecting more data won't help much and the model might already
-exploit all available redundancies in the data for its predictions.
 
 # Results
 
@@ -388,7 +327,69 @@ dd4b7fb7|0.0364|[[I{fr:-64,to:0}]];[D{d:20};D{d:20}]|false
 133343f1|0.0365|[[I{fr:-64,to:0};C{k:8,ch:16};C{k:8,ch:32}]];[D{d:20};D{d:20}]|false
 7d8736dd|0.0365|[[I{fr:-64,to:0};C{k:8,ch:16};C{k:8,ch:32}]];[D{d:20};D{d:20}]|true
 
-# Debugging
+# Analysis and Discussion
+
+## Effect of features
+
+Using the model structure `[[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}]`, the
+following table shows how the different features affect the final performance
+of the model.
+
+Input Features   | RSME
+-----------------|--------
+`WIND_SPEED`     | 0.0382
++`GUST_SPEED`   | 0.0374
++`AIR_PRESSURE` | 0.0370
++`AIR_TEMP`     | 0.0362
++`WIND_DIR`     | 0.0362
++`HOUR`         | 0.0360
++`MONTH`        | 0.0360
+`HOUR` `MONTH` as static features | 0.0359
+
+The last entry shows the results in which the `HOUR` and `MONTH` features are
+not fed as time dependent features, but directly as static features into the
+dense layers.
+
+## Effect of look-back window
+
+`[I{fr:-H,to:0};L{ch:30}]];[D{d:40};D{d:40}]`
+
+History | RSME
+--------|-----
+1       | 0.0372
+2       | 0.0367
+4       | 0.0364
+8       | 0.0362
+16      | 0.0360
+32      | 0.0359
+64      | 0.0359
+128     | 0.0358
+256     | 0.0358
+
+Beyond a history of 128 (~20h), there are diminishing returns in the predictive
+power.
+
+## Effect of available training data
+
+Using the model structure `[[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}]`, the
+following table shows how the amount of available training data affects the
+resulting performance of the model on a holdout set.
+
+Data Used   | RMSE
+------------|---------------
+100%        | 0.0359
+50%         | 0.0359
+25%         | 0.0363
+10%         | 0.0367
+5%          | 0.0373
+3%          | 0.0379
+1%          | 0.0516
+
+It can be seen that the performance reaches a plateau: using only half of the
+training data does not cause any decrease in performace. Based on this, it
+looks like collecting more data won't help much and the model might already
+exploit all available redundancies in the data for its predictions.
+
 
 # Conclusion
 
