@@ -258,17 +258,20 @@ still there is a discrepancy in actual values.
 
 # Training
 
-* Dropout: I applied dropout to all layers. I also tried only applying it to
-  LSTM layers. However, any use of dropout made the results worse.
+I train for `20` epochs and a batch size of `256` and a learning rate of
+`0.001` and `ADAM` as optimizer. When dropout is enabled, it is applied to all
+layers described via the "model architecture language" (see above). However,
+using dropout has not shown any useful effect here. While I could clearly
+observe that it reduces overfitting and there is a smaller discrepancy between
+train loss and eval loss, the best performance was still always worse with
+dropout than without dropout.
 
-* Batchnorm: I can clearly see the effect of batch norm: The training run
-  converges much faster. However, the final results were worse with batch norm
-  enabled. I think this is because the task is a regression problem and batch
-  norm effectively removes information from the input through the normalization
-  - which might be important information for the regression itself.
-
-WHERE DO I PUT THE BATCH NORM LAYERS. I put them between the final dense
-layers, and in the CNN layers. In-between the LSTM layers, I don't put them. WHY??
+Batchnorm layers are added into the final layers of the dense network. The
+training runs converge much faster with it enabled. However, the final results
+were almost always worse with batch norm enabled. I think this is because the
+task is a regression problem and batch norm effectively removes information
+from the input through the normalization - which might be important information
+for the regression itself.
 
 # Results
 
