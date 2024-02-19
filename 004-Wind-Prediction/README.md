@@ -4,6 +4,7 @@ Wind/Gust Speed and Direction | LSTM and Dense Activations during Training
 ---|---
 <img src="wind.png" width="500px"> | ![Training](training.gif)
 
+[![CNN Predictions](youtube.png)](http://www.youtube.com/watch?v=VP80Y7QM27U)
 
 # Table of Contents
 
@@ -15,7 +16,7 @@ Section|Description
 [Training Process](#training) | Dropout, Early Stopping
 [Results](#results) | Summary of results
 [Analysis and Discussion](#analysis-and-discussion) | [Effect of features](#effect-of-features), [Effect of look-back window](#effect-of-look-back-window), [Effect of available training data](#effect-of-available-training-data)
-[Conclusion](#discussion) | Conclusion
+[Conclusion](#conclusion) | Conclusion
 
 # Overview
 
