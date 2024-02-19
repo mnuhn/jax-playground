@@ -401,7 +401,30 @@ exploit all available redundancies in the data for its predictions.
 
 # Conclusion
 
-* Dense is actually quite ok.
-* CNNs don't work very well.
-* LSTM is best.
-* I could not find any improvements by combining CNNs with LSTMs.
+The most effective model (architecture
+`[[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}]`) achieves a Root Mean Square
+Error (RMSE) of `0.0359`. It significantly outperforms any basic baseline
+model, which has an RMSE of `0.0436`. Interestingly, its performance is only
+marginally better than that of a straightforward dense network
+`[[I{fr:-32,to:0}]];[D{d:40};D{d:40}]`, which yields an RMSE of `0.0361`.
+Notably, the top-performing models do not incorporate techniques such as
+convolutions or combinations of input spans with max pooling.
+
+Having studied the [effect of available training
+data](#effect-of-available-training-data), I conclude that gathering more
+training data would not significantly improve the performance of any model.
+
+Also, the analysis of the [effect of the look-back
+window](#effect-of-look-back-window) clearly shows diminishing returns after a
+context length of `128`.
+
+These observations lead to the conclusion that the models presented here are
+optimized to the extent that extracting further gains from the data through
+adjustments to the model architecture or increasing the training dataset size
+seems implausible.
+
+Overall, I think this makes sense: After all, weather is a non-local phenomenon
+and it is not really possible to forecast the weather and wind by just
+observing a local point. It would be really interesting to gather and use data
+from other weather stations nearby and study the effects on the predictive
+power.
