@@ -335,7 +335,7 @@ Using the model structure `[[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}]`, the
 following table shows how the different features affect the final performance
 of the model.
 
-Input Features   | RSME
+Input Features   | RMSE
 -----------------|--------
 `WIND_SPEED`     | 0.0382
 +`GUST_SPEED`   | 0.0374
@@ -354,7 +354,7 @@ dense layers.
 
 `[I{fr:-H,to:0};L{ch:30}]];[D{d:40};D{d:40}]`
 
-History | RSME
+History | RMSE
 --------|-----
 1       | 0.0372
 2       | 0.0367
