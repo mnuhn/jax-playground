@@ -294,38 +294,43 @@ bit worse. Always predicting zero is the worst.
 Here are the best results obtained by evaluating various model architectures as
 listed in `./eval-arch.sh`.
 
-Run     | RMSE | Architecture | Dropout
---------|------|--------------|--------
-0dcb67eb|0.0359|[[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}]|false
-6865e834|0.0359|[[I{fr:-256,to:0};L{ch:30}]];[D{d:40};D{d:40}]|false
-79e0c7af|0.0359|[[I{fr:-256,to:0};M{w:4};L{ch:30}];[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}]|false
-0c6238c2|0.036|[[I{fr:-64,to:0};L{ch:30}];[I{fr:-256,to:0};L{ch:30}]];[D{d:40};D{d:40}]|false
-0d0dacea|0.036|[[I{fr:-256,to:0};L{ch:30};L{ch:30}]];[D{d:40};D{d:40}]|false
-315ad7b4|0.036|[[I{fr:-256,to:0};L{ch:10};L{ch:10};L{ch:10}]];[D{d:40};D{d:40}]|false
-440867bf|0.036|[[I{fr:-64,to:0};L{ch:30};L{ch:30}]];[D{d:40};D{d:40}]|false
-571fb5cf|0.036|[[I{fr:-64,to:0};L{ch:30}];[I{fr:-256,to:0};L{ch:30}]];[D{d:40};D{d:40}]|true
-9b937108|0.036|[[I{fr:-256,to:0};M{w:2};L{ch:30}];[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}]|false
-1a7b3ddb|0.0361|[[I{fr:-256,to:0};M{w:2};L{ch:30}];[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}]|true
-4c31919c|0.0361|[[I{fr:-32,to:0}]];[D{d:40};D{d:40}]|false
-528573cf|0.0361|[[I{fr:-256,to:0};M{w:4};L{ch:30}];[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}]|true
-9a5839bb|0.0361|[[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}]|true
-bd4af8e2|0.0361|[[I{fr:-32,to:0}]];[D{d:40};D{d:40}]|true
-fec09d3c|0.0361|[[I{fr:-64,to:0};C{k:8,ch:16};C{k:8,ch:32};L{ch:10};L{ch:10}]];[D{d:20};D{d:20}]|false
-0de00f49|0.0362|[[I{fr:-256,to:0};L{ch:30};L{ch:30};L{ch:30}]];[D{d:40};D{d:40}]|false
-31fda887|0.0362|[[I{fr:-64,to:0}]];[D{d:40};D{d:40}]|false
-34f243cf|0.0362|[[I{fr:-64,to:0}]];[D{d:40};D{d:40}]|true
-4c97c7e0|0.0362|[[I{fr:-256,to:0};L{ch:30}]];[D{d:40};D{d:40}]|true
-4fef08f6|0.0362|[[I{fr:-32,to:0}]];[D{d:20};D{d:20}]|true
-5b5eeb49|0.0362|[[I{fr:-64,to:0};C{k:8,ch:16};C{k:8,ch:32};L{ch:10};L{ch:10}]];[D{d:20};D{d:20}]|true
-64090e5a|0.0363|[[I{fr:-256,to:0};L{ch:30};L{ch:30}]];[D{d:40};D{d:40}]|true
-7bbde554|0.0363|[[I{fr:-32,to:0}]];[D{d:20};D{d:20}]|false
-c02aa14d|0.0363|[[I{fr:-64,to:0};L{ch:30};L{ch:30}]];[D{d:40};D{d:40}]|true
-007f1e65|0.0364|[[I{fr:-256,to:0};L{ch:10};L{ch:10};L{ch:10}]];[D{d:40};D{d:40}]|true
-07a7ece9|0.0364|[[I{fr:-256,to:0};L{ch:30};L{ch:30};L{ch:30}]];[D{d:40};D{d:40}]|true
-23e53098|0.0364|[[I{fr:-64,to:0}]];[D{d:20};D{d:20}]|true
-dd4b7fb7|0.0364|[[I{fr:-64,to:0}]];[D{d:20};D{d:20}]|false
-133343f1|0.0365|[[I{fr:-64,to:0};C{k:8,ch:16};C{k:8,ch:32}]];[D{d:20};D{d:20}]|false
-7d8736dd|0.0365|[[I{fr:-64,to:0};C{k:8,ch:16};C{k:8,ch:32}]];[D{d:20};D{d:20}]|true
+Run     | Architecture | Dropout| RMSE 
+--------|--------------|--------|------
+0dcb67eb|`[[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}]`|false|0.0359
+6865e834|`[[I{fr:-256,to:0};L{ch:30}]];[D{d:40};D{d:40}]`|false|0.0359
+79e0c7af|`[[I{fr:-256,to:0};M{w:4};L{ch:30}];[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}]`|false|0.0359
+0c6238c2|`[[I{fr:-64,to:0};L{ch:30}];[I{fr:-256,to:0};L{ch:30}]];[D{d:40};D{d:40}]`|false|0.0360
+0d0dacea|`[[I{fr:-256,to:0};L{ch:30};L{ch:30}]];[D{d:40};D{d:40}]`|false|0.0360
+315ad7b4|`[[I{fr:-256,to:0};L{ch:10};L{ch:10};L{ch:10}]];[D{d:40};D{d:40}]`|false|0.0360
+440867bf|`[[I{fr:-64,to:0};L{ch:30};L{ch:30}]];[D{d:40};D{d:40}]`|false|0.0360
+571fb5cf|`[[I{fr:-64,to:0};L{ch:30}];[I{fr:-256,to:0};L{ch:30}]];[D{d:40};D{d:40}]`|true|0.0360
+9b937108|`[[I{fr:-256,to:0};M{w:2};L{ch:30}];[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}]`|false|0.0360
+1a7b3ddb|`[[I{fr:-256,to:0};M{w:2};L{ch:30}];[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}]`|true|0.0361
+4c31919c|`[[I{fr:-32,to:0}]];[D{d:40};D{d:40}]`|false|0.0361
+528573cf|`[[I{fr:-256,to:0};M{w:4};L{ch:30}];[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}]`|true|0.0361
+9a5839bb|`[[I{fr:-64,to:0};L{ch:30}]];[D{d:40};D{d:40}]`|true|0.0361
+bd4af8e2|`[[I{fr:-32,to:0}]];[D{d:40};D{d:40}]`|true|0.0361
+fec09d3c|`[[I{fr:-64,to:0};C{k:8,ch:16};C{k:8,ch:32};L{ch:10};L{ch:10}]];[D{d:20};D{d:20}]`|false|0.0361
+0de00f49|`[[I{fr:-256,to:0};L{ch:30};L{ch:30};L{ch:30}]];[D{d:40};D{d:40}]`|false|0.0362
+31fda887|`[[I{fr:-64,to:0}]];[D{d:40};D{d:40}]`|false|0.0362
+34f243cf|`[[I{fr:-64,to:0}]];[D{d:40};D{d:40}]`|true|0.0362
+4c97c7e0|`[[I{fr:-256,to:0};L{ch:30}]];[D{d:40};D{d:40}]`|true|0.0362
+4fef08f6|`[[I{fr:-32,to:0}]];[D{d:20};D{d:20}]`|true|0.0362
+5b5eeb49|`[[I{fr:-64,to:0};C{k:8,ch:16};C{k:8,ch:32};L{ch:10};L{ch:10}]];[D{d:20};D{d:20}]`|true|0.0362
+64090e5a|`[[I{fr:-256,to:0};L{ch:30};L{ch:30}]];[D{d:40};D{d:40}]`|true|0.0363
+7bbde554|`[[I{fr:-32,to:0}]];[D{d:20};D{d:20}]`|false|0.0363
+c02aa14d|`[[I{fr:-64,to:0};L{ch:30};L{ch:30}]];[D{d:40};D{d:40}]`|true|0.0363
+007f1e65|`[[I{fr:-256,to:0};L{ch:10};L{ch:10};L{ch:10}]];[D{d:40};D{d:40}]`|true|0.0364
+07a7ece9|`[[I{fr:-256,to:0};L{ch:30};L{ch:30};L{ch:30}]];[D{d:40};D{d:40}]`|true|0.0364
+23e53098|`[[I{fr:-64,to:0}]];[D{d:20};D{d:20}]`|true|0.0364
+dd4b7fb7|`[[I{fr:-64,to:0}]];[D{d:20};D{d:20}]`|false|0.0364
+133343f1|`[[I{fr:-64,to:0};C{k:8,ch:16};C{k:8,ch:32}]];[D{d:20};D{d:20}]`|false|0.0365
+7d8736dd|`[[I{fr:-64,to:0};C{k:8,ch:16};C{k:8,ch:32}]];[D{d:20};D{d:20}]`|true|0.0365
+
+Part of the evaluation were also architectures with pure convolutions,
+combinations of LSTM and CNN, and more complex combinations of different input
+spans. As can be seen, yet the best performing model is just an LSTM operating
+over the last 64 time steps.
 
 # Analysis and Discussion
 
