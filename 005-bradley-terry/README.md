@@ -1,0 +1,36 @@
+Compute `Bradley-Terry` scores based on results of NBA matches.
+
+Example results for NBA data from 2012:
+
+```
+1. MIA (1.37)
+2. OKC (1.06)
+3. SAS (0.96)
+4. DEN (0.90)
+5. MEM (0.82)
+6. LAC (0.81)
+7. NYK (0.61)
+8. IND (0.33)
+9. GSW (0.33)
+10. BKN (0.31)
+11. HOU (0.22)
+12. LAL (0.22)
+13. CHI (0.12)
+14. UTA (0.11)
+15. ATL (0.05)
+16. DAL (-0.00)
+17. BOS (-0.06)
+18. MIL (-0.25)
+19. POR (-0.39)
+20. PHI (-0.45)
+21. TOR (-0.50)
+22. MIN (-0.51)
+23. SAC (-0.67)
+24. NOH (-0.71)
+25. WAS (-0.73)
+26. DET (-0.76)
+27. PHX (-0.85)
+28. CLE (-1.03)
+29. CHA (-1.23)
+30. ORL (-1.30)
+```
