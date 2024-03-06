@@ -1,0 +1,4 @@
+m.model
+m.vocab
+*.warc.gz
+*.warc.wet
