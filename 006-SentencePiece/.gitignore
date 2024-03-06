@@ -1,4 +1,4 @@
-m.model
-m.vocab
+m*.model
+m*.vocab
 *.warc.gz
 *.warc.wet
