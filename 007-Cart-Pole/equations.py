@@ -69,7 +69,7 @@ def draw(frame, state):
 
   draw.line((xx(state.x - 1), yy(0), xx(state.x + 1), yy(0)),
             fill=(255, 255, 255, 128))
-  draw.line((xx(state.x + x_end), yy(y_end), xx(state.x), yy(0)),
+  draw.line((xx(x_end), yy(y_end), xx(state.x), yy(0)),
             fill=(255, 255, 255, 128))
 
   return im
