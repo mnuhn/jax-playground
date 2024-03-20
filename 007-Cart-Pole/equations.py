@@ -3,6 +3,7 @@ import tqdm
 from PIL import Image, ImageDraw
 import random
 import numpy as np
+import jax
 
 # Static
 l = 3
@@ -66,11 +67,6 @@ def move_opposite_upswing(state, params=None):
 # TODO: IMPLEMENT Q LEARNING - WORK IN PROGRESS
 
 
-
-# Simple linear combination of the state params for Q.
-def q_function(state, action, params):
-  return state.x * params[0] + state.v * params[1] + state.theta * params[
-      2] + state.theta_dot * params[3]
 # Use the delta in y component above zero as reward.
 def reward(state, action):
   state_new = time_step(state, force=action)
@@ -78,21 +74,27 @@ def reward(state, action):
 
 
 # Returns the action (=force) with the best Q value for the given state.
-def q_policy(state, q_function, params):
+def q_policy(state, params):
+  # Simple linear combination of the state params for Q.
+  def q_function(state, action, params):
+    vec2 = np.append(state.vec, action)
+    result = np.sum(jax.nn.sigmoid(np.dot(params, vec2)))
+    return result
+
   best_force = 0
-  best = q_function(state, 0, params)
+  best_value = -1
 
   # To simplify, just use a few discrete options for the force.
   for force in [-3, -2, -1, 0, +1, +2, +3]:
-    if q_function(state, force, params) > best:
-      best = q_function(state, force, params)
+    if q_function(state, force, params) > best_value:
+      best_value = q_function(state, force, params)
       best_force = force
 
-  return best_force
+  return best_force, best_value
 
 
-def update_q_function():
-  pass
+def q_policy_noval(state, params):
+  return q_policy(state, params)[0]
 
 
 def state_derivative(state, force):
@@ -120,6 +122,13 @@ def time_step(state, force, eps=0.0001):
   v = state.vec[INDEX_V] + a * eps
 
   return PoleCartState(x=x, v=v, theta=theta, theta_dot=theta_d)
+
+
+def improved_q_value(state, action, params):
+  gamma = 0.1
+  best_next_value = q_policy(state, params)[1]
+  improved_current_value = reward(state, action) + gamma * best_next_value
+  return improved_current_value
 
 
 def draw(step, state, force):
@@ -163,6 +172,10 @@ def evaluate(start_state, policy, image_fn=None):
   images = []
   state = start_state
   steps_up = 0
+  params = np.random.random([5, 5]) - 0.5
+
+  training_data = []
+
   while True:
     step += 1
 
@@ -170,7 +183,12 @@ def evaluate(start_state, policy, image_fn=None):
     force = max(min(force, MAX_FORCE), -MAX_FORCE)
 
     state = time_step(state, force=force, eps=0.001)
-    if state.theta < 0.1 * pi or state.theta > 1.9 * pi:
+
+    training_data.append(
+        (state.vec, force, improved_q_value(state, action=force,
+                                            params=params)))
+
+    if state.vec[INDEX_THETA] < 0.1 * pi or state.vec[INDEX_THETA] > 1.9 * pi:
       steps_up += 1
     if step % 250 == 0 and image_fn:
       images.append(draw(step, state, force))
@@ -206,3 +224,5 @@ evaluate(start_state, policy=move_opposite, image_fn="move_opposite2.gif")
 evaluate(start_state,
          policy=move_opposite,
          image_fn="move_opposite_upswing2.gif")
+
+evaluate(start_state, policy=q_policy_noval, image_fn="q_policy.gif")
