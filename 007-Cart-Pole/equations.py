@@ -13,6 +13,24 @@ m_cart = 3.0
 MAX_FORCE = 10.0
 
 
+# State:
+class PoleCartState:
+
+  def __init__(self, x, v, theta, theta_dot):
+    self.x = x
+    self.v = v
+    self.theta = theta % (2 * pi)
+    self.theta_dot = theta_dot
+
+  def __str__(self):
+    return (f"X: {self.x}, V: {self.v}, "
+            f"Theta: {self.theta}, Theta Dot: {self.theta_dot}")
+
+
+# Action: $a \in [-MAX_FORCE, MAX_FORCE]$
+
+
+# All policies $\pi(s)$ are deterministic.
 def move_nothing(state):
   return 0.0
 
@@ -28,27 +46,15 @@ def move_random(state):
 def move_opposite(state):
   # If the pole falls to the right, move right - and vice versa.
   angle = (state.theta - pi)
-  return - angle * 10
+  return -angle * 10
+
 
 def move_opposite_upswing(state):
   # If the pole falls to the right, move right - and vice versa.
   angle = (state.theta - pi)
   if abs(angle) > pi * 0.5:
-    return - angle * 10
+    return -angle * 10
   return angle * 10
-
-
-class PoleCartState:
-
-  def __init__(self, x, v, theta, theta_dot):
-    self.x = x
-    self.v = v
-    self.theta = theta % (2 * pi)
-    self.theta_dot = theta_dot
-
-  def __str__(self):
-    return (f"X: {self.x}, V: {self.v}, "
-            f"Theta: {self.theta}, Theta Dot: {self.theta_dot}")
 
 
 def state_derivative(state, force):
@@ -102,7 +108,7 @@ def draw(frame, state, force):
   return im
 
 
-def evaluate(start_state, controller, image_fn=None):
+def evaluate(start_state, policy, image_fn=None):
   frame = 0
   images = []
   state = start_state
@@ -110,7 +116,7 @@ def evaluate(start_state, controller, image_fn=None):
   while True:
     frame += 1
 
-    force = controller(state)
+    force = policy(state)
     force = max(min(force, MAX_FORCE), -MAX_FORCE)
 
     state = time_step(state, force=force)
@@ -133,17 +139,20 @@ def evaluate(start_state, controller, image_fn=None):
 
 start_state = PoleCartState(x=0.0, v=0.0, theta=0.01 * pi, theta_dot=0.0)
 
-evaluate(start_state, controller=move_nothing, image_fn="move_nothing.gif")
-evaluate(start_state, controller=move_constant, image_fn="move_constant.gif")
-evaluate(start_state, controller=move_random, image_fn="move_random.gif")
-evaluate(start_state, controller=move_opposite, image_fn="move_opposite.gif")
-evaluate(start_state, controller=move_opposite, image_fn="move_opposite_upswing.gif")
-
+evaluate(start_state, policy=move_nothing, image_fn="move_nothing.gif")
+evaluate(start_state, policy=move_constant, image_fn="move_constant.gif")
+evaluate(start_state, policy=move_random, image_fn="move_random.gif")
+evaluate(start_state, policy=move_opposite, image_fn="move_opposite.gif")
+evaluate(start_state,
+         policy=move_opposite,
+         image_fn="move_opposite_upswing.gif")
 
 start_state = PoleCartState(x=0.0, v=0.0, theta=0.01 * pi, theta_dot=0.5)
 
-evaluate(start_state, controller=move_nothing, image_fn="move_nothing2.gif")
-evaluate(start_state, controller=move_constant, image_fn="move_constant2.gif")
-evaluate(start_state, controller=move_random, image_fn="move_random2.gif")
-evaluate(start_state, controller=move_opposite, image_fn="move_opposite2.gif")
-evaluate(start_state, controller=move_opposite, image_fn="move_opposite_upswing2.gif")
+evaluate(start_state, policy=move_nothing, image_fn="move_nothing2.gif")
+evaluate(start_state, policy=move_constant, image_fn="move_constant2.gif")
+evaluate(start_state, policy=move_random, image_fn="move_random2.gif")
+evaluate(start_state, policy=move_opposite, image_fn="move_opposite2.gif")
+evaluate(start_state,
+         policy=move_opposite,
+         image_fn="move_opposite_upswing2.gif")
