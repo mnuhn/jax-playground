@@ -39,3 +39,28 @@ lower half.
 
 <img src="move_opposite_upswing.gif">
 <img src="move_opposite_upswing2.gif">
+
+## Recap: Markov Decision Process
+
+Based on https://www.cs.cmu.edu/~mgormley/courses/10601-s17/slides/lecture26-ri.pdf
+
+Markov Decision Process = RL Framework + Markov Assumption
+
+* States $S$, sequence $s_0^T = (s_0, s_1, ..., s_T)$
+* Actions $A$, sequence $a_0^T = (a_0, a_1, ..., a_T)$
+* Markov assumption: $p(s_{t+1}|s_0^t, a_0^t) = p(s_{t+1}|s_t,a_t)$
+* Reward assumption: $r(s_0^{t+1}, a_0^t) = r(s_t, a_t, s_{t+1}) = r_{t+1}$
+* Policy: $\pi(s_t,a_t) = p(a_t|s_t)$
+
+Goal: Find the optimal policy
+$$
+\tilde \pi = \arg\max\limits_{\pi} \sum_{t=0}^{\infty} \gamma^t r_t
+$$
+
+Discount rate $\gamma$ is introduced to make the reward finite.
+
+TODO:
+* Value function $V^\pi(s)$
+* Bellman Equation
+* Action-Value Function $Q^\pi(s,a)$
+
