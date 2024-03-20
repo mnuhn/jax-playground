@@ -31,25 +31,25 @@ class PoleCartState:
 
 
 # All policies $\pi(s)$ are deterministic.
-def move_nothing(state):
+def move_nothing(state, params=None):
   return 0.0
 
 
-def move_constant(state):
+def move_constant(state, params=None):
   return 3.0
 
 
-def move_random(state):
+def move_random(state, params=None):
   return 10 * (random.random() - 0.5)
 
 
-def move_opposite(state):
+def move_opposite(state, params=None):
   # If the pole falls to the right, move right - and vice versa.
   angle = (state.theta - pi)
   return -angle * 10
 
 
-def move_opposite_upswing(state):
+def move_opposite_upswing(state, params=None):
   # If the pole falls to the right, move right - and vice versa.
   angle = (state.theta - pi)
   if abs(angle) > pi * 0.5:
@@ -157,7 +157,7 @@ def evaluate(start_state, policy, image_fn=None):
   while True:
     step += 1
 
-    force = policy(state)
+    force = policy(state, params=params)
     force = max(min(force, MAX_FORCE), -MAX_FORCE)
 
     state = time_step(state, force=force, eps=0.001)
