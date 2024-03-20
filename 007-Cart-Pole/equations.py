@@ -57,6 +57,38 @@ def move_opposite_upswing(state):
   return angle * 10
 
 
+# TODO: IMPLEMENT Q LEARNING - WORK IN PROGRESS
+
+
+# Use the y component above zero as reward.
+def reward(state):
+  return max(0, cos(state.theta))
+
+
+# Simple linear combination of the state params for Q.
+def q_function(state, action, params):
+  return state.x * params[0] + state.v * params[1] + state.theta * params[
+      2] + state.theta_dot * params[3]
+
+
+# Returns the action (=force) with the best Q value for the given state.
+def q_policy(state, q_function, params):
+  best_force = 0
+  best = q_function(state, 0, params)
+
+  # To simplify, just use a few discrete options for the force.
+  for force in [-3, -2, -1, 0, +1, +2, +3]:
+    if q_function(state, force, params) > best:
+      best = q_function(state, force, params)
+      best_force = force
+
+  return best_force
+
+
+def update_q_function():
+  pass
+
+
 def state_derivative(state, force):
   sin_theta = sin(state.theta)
   cos_theta = cos(state.theta)
