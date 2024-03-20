@@ -83,7 +83,7 @@ def time_step(state, force, eps=0.0001):
   return PoleCartState(x=x, v=v, theta=theta, theta_dot=theta_d)
 
 
-def draw(frame, state, force):
+def draw(step, state, force):
   x_end = state.x + l * sin(state.theta)
   y_end = -l * cos(state.theta)
 
@@ -95,6 +95,15 @@ def draw(frame, state, force):
 
   im = Image.new(mode="RGB", size=(400, 100))
   draw = ImageDraw.Draw(im)
+
+  draw.text((0, 0), f"step={step: >5d}")
+
+  draw.text((0, 70), f"f ={force: >+5.1f}N", fill=(255, 0, 0, 255))
+  draw.text((0, 80), f"x ={state.x: >+5.1f}m")
+  draw.text((0, 90), f"x'={state.v: >+5.1f}m/s")
+
+  draw.text((80, 80), f"t ={state.theta/pi*180: >+6.1f}°")
+  draw.text((80, 90), f"t'={state.theta_dot/pi*180: >+6.1f}°/s")
 
   draw.line((xx(state.x - 1), yy(0), xx(state.x + 1), yy(0)),
             fill=(255, 255, 255, 128))
@@ -109,22 +118,22 @@ def draw(frame, state, force):
 
 
 def evaluate(start_state, policy, image_fn=None):
-  frame = 0
+  step = 0
   images = []
   state = start_state
   steps_up = 0
   while True:
-    frame += 1
+    step += 1
 
     force = policy(state)
     force = max(min(force, MAX_FORCE), -MAX_FORCE)
 
-    state = time_step(state, force=force)
+    state = time_step(state, force=force, eps=0.001)
     if state.theta < 0.1 * pi or state.theta > 1.9 * pi:
       steps_up += 1
-    if frame % 2500 == 0 and image_fn:
-      images.append(draw(frame, state, force))
-    if frame > 300000:
+    if step % 250 == 0 and image_fn:
+      images.append(draw(step, state, force))
+    if step > 20000:
       break
 
   if image_fn:
