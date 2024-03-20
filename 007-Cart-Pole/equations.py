@@ -2,6 +2,7 @@ from math import sin, cos, pi
 import tqdm
 from PIL import Image, ImageDraw
 import random
+import numpy as np
 
 # Static
 l = 3
@@ -12,19 +13,24 @@ m_pole = 1.0
 m_cart = 3.0
 MAX_FORCE = 10.0
 
+INDEX_X = 0
+INDEX_V = 1
+INDEX_THETA = 2
+INDEX_THETA_DOT = 3
+
 
 # State:
 class PoleCartState:
 
   def __init__(self, x, v, theta, theta_dot):
-    self.x = x
-    self.v = v
-    self.theta = theta % (2 * pi)
-    self.theta_dot = theta_dot
+    self.vec = np.zeros(4)
+    self.vec[INDEX_X] = x
+    self.vec[INDEX_V] = v
+    self.vec[INDEX_THETA] = theta % (2 * pi)
+    self.vec[INDEX_THETA_DOT] = theta_dot
 
   def __str__(self):
-    return (f"X: {self.x}, V: {self.v}, "
-            f"Theta: {self.theta}, Theta Dot: {self.theta_dot}")
+    return (f"vec: {self.vec}")
 
 
 # Action: $a \in [-MAX_FORCE, MAX_FORCE]$
@@ -45,13 +51,13 @@ def move_random(state, params=None):
 
 def move_opposite(state, params=None):
   # If the pole falls to the right, move right - and vice versa.
-  angle = (state.theta - pi)
+  angle = (state.vec[INDEX_THETA] - pi)
   return -angle * 10
 
 
 def move_opposite_upswing(state, params=None):
   # If the pole falls to the right, move right - and vice versa.
-  angle = (state.theta - pi)
+  angle = (state.vec[INDEX_THETA] - pi)
   if abs(angle) > pi * 0.5:
     return -angle * 10
   return angle * 10
@@ -60,15 +66,15 @@ def move_opposite_upswing(state, params=None):
 # TODO: IMPLEMENT Q LEARNING - WORK IN PROGRESS
 
 
-# Use the y component above zero as reward.
-def reward(state):
-  return max(0, cos(state.theta))
-
 
 # Simple linear combination of the state params for Q.
 def q_function(state, action, params):
   return state.x * params[0] + state.v * params[1] + state.theta * params[
       2] + state.theta_dot * params[3]
+# Use the delta in y component above zero as reward.
+def reward(state, action):
+  state_new = time_step(state, force=action)
+  return cos(state_new.vec[INDEX_THETA]) - cos(state.vec[INDEX_THETA])
 
 
 # Returns the action (=force) with the best Q value for the given state.
@@ -90,34 +96,35 @@ def update_q_function():
 
 
 def state_derivative(state, force):
-  sin_theta = sin(state.theta)
-  cos_theta = cos(state.theta)
+  sin_theta = sin(state.vec[INDEX_THETA])
+  cos_theta = cos(state.vec[INDEX_THETA])
 
   a = m_pole * g * sin_theta * cos_theta
-  a -= 7 / 3 * (force + m_pole * l * state.theta_dot**2 * sin_theta -
-                mu_c * state.v)
-  a -= mu_p * state.theta_dot * cos_theta / l
+  a -= 7 / 3 * (force + m_pole * l * state.vec[INDEX_THETA_DOT]**2 * sin_theta -
+                mu_c * state.vec[INDEX_V])
+  a -= mu_p * state.vec[INDEX_THETA_DOT] * cos_theta / l
   a /= m_pole * cos_theta * cos_theta - 7 / 3 * (m_pole + m_cart)
 
   theta_dd = 3 / (7 * l) * (g * sin_theta - a * cos_theta -
-                            mu_p * state.theta_dot / (m_pole * l))
+                            mu_p * state.vec[INDEX_THETA_DOT] / (m_pole * l))
 
-  return (state.theta_dot, theta_dd, state.v, a)
+  return np.array([state.vec[INDEX_THETA_DOT], theta_dd, state.vec[INDEX_V], a])
 
 
 def time_step(state, force, eps=0.0001):
   _, theta_dd, _, a = state_derivative(state, force=force)
-  theta = state.theta + state.theta_dot * eps + 1 / 2 * theta_dd * eps**2
-  theta_d = state.theta_dot + theta_dd * eps
-  x = state.x + state.v * eps + 1 / 2 * a * eps**2
-  v = state.v + a * eps
+  theta = state.vec[INDEX_THETA] + state.vec[
+      INDEX_THETA_DOT] * eps + 1 / 2 * theta_dd * eps**2
+  theta_d = state.vec[INDEX_THETA_DOT] + theta_dd * eps
+  x = state.vec[INDEX_X] + state.vec[INDEX_V] * eps + 1 / 2 * a * eps**2
+  v = state.vec[INDEX_V] + a * eps
 
   return PoleCartState(x=x, v=v, theta=theta, theta_dot=theta_d)
 
 
 def draw(step, state, force):
-  x_end = state.x + l * sin(state.theta)
-  y_end = -l * cos(state.theta)
+  x_end = state.vec[INDEX_X] + l * sin(state.vec[INDEX_THETA])
+  y_end = -l * cos(state.vec[INDEX_THETA])
 
   def xx(x_in):
     return 200 + int(x_in * 10)
@@ -131,19 +138,21 @@ def draw(step, state, force):
   draw.text((0, 0), f"step={step: >5d}")
 
   draw.text((0, 70), f"f ={force: >+5.1f}N", fill=(255, 0, 0, 255))
-  draw.text((0, 80), f"x ={state.x: >+5.1f}m")
-  draw.text((0, 90), f"x'={state.v: >+5.1f}m/s")
+  draw.text((0, 80), f"x ={state.vec[INDEX_X]: >+5.1f}m")
+  draw.text((0, 90), f"x'={state.vec[INDEX_V]: >+5.1f}m/s")
 
-  draw.text((80, 80), f"t ={state.theta/pi*180: >+6.1f}°")
-  draw.text((80, 90), f"t'={state.theta_dot/pi*180: >+6.1f}°/s")
+  draw.text((80, 80), f"t ={state.vec[INDEX_THETA]/pi*180: >+6.1f}°")
+  draw.text((80, 90), f"t'={state.vec[INDEX_THETA_DOT]/pi*180: >+6.1f}°/s")
 
-  draw.line((xx(state.x - 1), yy(0), xx(state.x + 1), yy(0)),
-            fill=(255, 255, 255, 128))
+  draw.line(
+      (xx(state.vec[INDEX_X] - 1), yy(0), xx(state.vec[INDEX_X] + 1), yy(0)),
+      fill=(255, 255, 255, 128))
 
-  draw.line((xx(state.x), yy(1), xx(state.x + force), yy(1)),
-            fill=(255, 0, 0, 128))
+  draw.line(
+      (xx(state.vec[INDEX_X]), yy(1), xx(state.vec[INDEX_X] + force), yy(1)),
+      fill=(255, 0, 0, 128))
 
-  draw.line((xx(x_end), yy(y_end), xx(state.x), yy(0)),
+  draw.line((xx(x_end), yy(y_end), xx(state.vec[INDEX_X]), yy(0)),
             fill=(255, 255, 255, 128))
 
   return im
