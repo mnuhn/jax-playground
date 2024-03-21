@@ -1,17 +1,21 @@
 from math import sin, cos, pi
-import tqdm
 from PIL import Image, ImageDraw
 import random
 import numpy as np
 import jax
+from jax import numpy as jnp
+from jax import grad
+
+# USE SIN(THETA), COS(THETA) in Q FUNCTION
 
 # Static
 l = 3
 mu_c = 3.0
 mu_p = 2.0
-g = 9.81
+const_g = 9.81
 m_pole = 1.0
 m_cart = 3.0
+eps = 0.01
 MAX_FORCE = 10.0
 
 INDEX_X = 0
@@ -70,50 +74,57 @@ def move_opposite_upswing(state, params=None):
 # Use the delta in y component above zero as reward.
 def reward(state, action):
   state_new = time_step(state, force=action)
-  return cos(state_new.vec[INDEX_THETA]) - cos(state.vec[INDEX_THETA])
+  return cos(state_new.vec[INDEX_THETA]) - abs(state_new.vec[INDEX_THETA_DOT])# - cos(state.vec[INDEX_THETA])
 
+@jax.jit
+def q_function(state_action_vec, params):
+  layer1 = jax.nn.sigmoid(state_action_vec @ params)
+  result = jnp.average(layer1, axis=1)
+  return result
 
 # Returns the action (=force) with the best Q value for the given state.
-def q_policy(state, params):
+def q_policy(state, params, explore=False):
   # Simple linear combination of the state params for Q.
-  def q_function(state, action, params):
-    vec2 = np.append(state.vec, action)
-    result = np.sum(jax.nn.sigmoid(np.dot(params, vec2)))
-    return result
 
   best_force = 0
-  best_value = -1
+  best_value = None
 
   # To simplify, just use a few discrete options for the force.
-  for force in [-3, -2, -1, 0, +1, +2, +3]:
-    if q_function(state, force, params) > best_value:
-      best_value = q_function(state, force, params)
+  tries = np.arange(-MAX_FORCE, MAX_FORCE)
+  random.shuffle(tries)
+  for force in tries:
+    state_action_vec = jnp.expand_dims(np.append(state.vec, force), axis=0)
+    value = q_function(state_action_vec, params)[0]
+    if best_value is None or value > best_value:
+      best_value = value
       best_force = force
+    if explore and random.random() < 0.05:
+      # simple randomness
+      return force, value
 
   return best_force, best_value
 
 
-def q_policy_noval(state, params):
-  return q_policy(state, params)[0]
+def q_policy_noval(state, params, explore=False):
+  return q_policy(state, params, explore=explore)[0]
 
 
 def state_derivative(state, force):
   sin_theta = sin(state.vec[INDEX_THETA])
   cos_theta = cos(state.vec[INDEX_THETA])
 
-  a = m_pole * g * sin_theta * cos_theta
+  a = m_pole * const_g * sin_theta * cos_theta
   a -= 7 / 3 * (force + m_pole * l * state.vec[INDEX_THETA_DOT]**2 * sin_theta -
                 mu_c * state.vec[INDEX_V])
   a -= mu_p * state.vec[INDEX_THETA_DOT] * cos_theta / l
   a /= m_pole * cos_theta * cos_theta - 7 / 3 * (m_pole + m_cart)
-
-  theta_dd = 3 / (7 * l) * (g * sin_theta - a * cos_theta -
+  theta_dd = 3 / (7 * l) * (const_g * sin_theta - a * cos_theta -
                             mu_p * state.vec[INDEX_THETA_DOT] / (m_pole * l))
 
   return np.array([state.vec[INDEX_THETA_DOT], theta_dd, state.vec[INDEX_V], a])
 
 
-def time_step(state, force, eps=0.0001):
+def time_step(state, force):
   _, theta_dd, _, a = state_derivative(state, force=force)
   theta = state.vec[INDEX_THETA] + state.vec[
       INDEX_THETA_DOT] * eps + 1 / 2 * theta_dd * eps**2
@@ -125,7 +136,7 @@ def time_step(state, force, eps=0.0001):
 
 
 def improved_q_value(state, action, params):
-  gamma = 0.1
+  gamma = 0.3
   best_next_value = q_policy(state, params)[1]
   improved_current_value = reward(state, action) + gamma * best_next_value
   return improved_current_value
@@ -167,32 +178,30 @@ def draw(step, state, force):
   return im
 
 
-def evaluate(start_state, policy, image_fn=None):
+def evaluate(start_state, policy, params, image_fn=None):
   step = 0
   images = []
   state = start_state
-  steps_up = 0
-  params = np.random.random([5, 5]) - 0.5
 
-  training_data = []
+  state_action_vecs = []
+  improved_q_vec = []
 
   while True:
     step += 1
 
-    force = policy(state, params=params)
+    force = policy(state, params=params, explore=True)
     force = max(min(force, MAX_FORCE), -MAX_FORCE)
 
-    state = time_step(state, force=force, eps=0.001)
+    state = time_step(state, force=force)
+    state_action_vec = np.append(state.vec, [force])
 
-    training_data.append(
-        (state.vec, force, improved_q_value(state, action=force,
-                                            params=params)))
+    state_action_vecs.append(state_action_vec)
+    q_new = improved_q_value(state, action=force, params=params)
+    improved_q_vec.append([q_new])
 
-    if state.vec[INDEX_THETA] < 0.1 * pi or state.vec[INDEX_THETA] > 1.9 * pi:
-      steps_up += 1
-    if step % 250 == 0 and image_fn:
+    if step % 25 == 0 and image_fn:
       images.append(draw(step, state, force))
-    if step > 20000:
+    if abs(state.vec[INDEX_THETA] - pi) < 0.75 * pi:
       break
 
   if image_fn:
@@ -202,27 +211,42 @@ def evaluate(start_state, policy, image_fn=None):
                    duration=10,
                    loop=0)
 
-  return steps_up
+  return state_action_vecs, improved_q_vec
 
+key = jax.random.key(0)
 
-start_state = PoleCartState(x=0.0, v=0.0, theta=0.01 * pi, theta_dot=0.0)
+params = 0.2 * (np.random.random([5, 5]) - 0.5)
 
-evaluate(start_state, policy=move_nothing, image_fn="move_nothing.gif")
-evaluate(start_state, policy=move_constant, image_fn="move_constant.gif")
-evaluate(start_state, policy=move_random, image_fn="move_random.gif")
-evaluate(start_state, policy=move_opposite, image_fn="move_opposite.gif")
-evaluate(start_state,
-         policy=move_opposite,
-         image_fn="move_opposite_upswing.gif")
+for i in range(0,100):
+  a_vecs = []
+  q_vecs = []
+  for j in range(0,10):
+    print(f"{i} {j}")
+    start_state = PoleCartState(x=0.0, v=0.0, theta=0.01 * pi, theta_dot=0.0)
+    print(params)
+    a_v, q_v = evaluate(start_state, policy=q_policy_noval, params=params, image_fn=f"q_policy{i}.{j}.gif")
+    for a in a_v:
+      a_vecs.append(a)
+    for q in q_v:
+      q_vecs.append(q)
+ 
+  print("Optimizing Q")
+  a_vecs = np.stack(a_vecs, axis=0)
+  q_vecs = np.stack(q_vecs, axis=0)
 
-start_state = PoleCartState(x=0.0, v=0.0, theta=0.01 * pi, theta_dot=0.5)
+  predicted_qs = q_function(a_vecs, params)
+  predicted_qs = np.expand_dims(predicted_qs, axis=1)
 
-evaluate(start_state, policy=move_nothing, image_fn="move_nothing2.gif")
-evaluate(start_state, policy=move_constant, image_fn="move_constant2.gif")
-evaluate(start_state, policy=move_random, image_fn="move_random2.gif")
-evaluate(start_state, policy=move_opposite, image_fn="move_opposite2.gif")
-evaluate(start_state,
-         policy=move_opposite,
-         image_fn="move_opposite_upswing2.gif")
+  def loss(params):
+    q_preds = q_function(a_vecs, params)
+    loss = jnp.average((q_vecs - q_preds)**2)
+    return loss
 
-evaluate(start_state, policy=q_policy_noval, image_fn="q_policy.gif")
+  for i in range(100):
+    g = grad(loss)(params)
+    if i % 25 == 0:
+      print(f"{i}. loss=", loss(params))
+    params = params - 0.01 * g
+
+#start_state = PoleCartState(x=0.0, v=0.0, theta=0.01 * pi, theta_dot=0.5)
+#evaluate(start_state, policy=q_policy_noval, image_fn="q_policy.gif")
