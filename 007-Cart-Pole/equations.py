@@ -74,13 +74,16 @@ def move_opposite_upswing(state, params=None):
 # Use the delta in y component above zero as reward.
 def reward(state, action):
   state_new = time_step(state, force=action)
-  return cos(state_new.vec[INDEX_THETA]) - abs(state_new.vec[INDEX_THETA_DOT])# - cos(state.vec[INDEX_THETA])
+  return cos(state_new.vec[INDEX_THETA]) - abs(
+      state_new.vec[INDEX_THETA_DOT])  # - cos(state.vec[INDEX_THETA])
+
 
 @jax.jit
 def q_function(state_action_vec, params):
   layer1 = jax.nn.sigmoid(state_action_vec @ params)
   result = jnp.average(layer1, axis=1)
   return result
+
 
 # Returns the action (=force) with the best Q value for the given state.
 def q_policy(state, params, explore=False):
@@ -213,23 +216,27 @@ def evaluate(start_state, policy, params, image_fn=None):
 
   return state_action_vecs, improved_q_vec
 
+
 key = jax.random.key(0)
 
 params = 0.2 * (np.random.random([5, 5]) - 0.5)
 
-for i in range(0,100):
+for i in range(0, 100):
   a_vecs = []
   q_vecs = []
-  for j in range(0,10):
+  for j in range(0, 10):
     print(f"{i} {j}")
     start_state = PoleCartState(x=0.0, v=0.0, theta=0.01 * pi, theta_dot=0.0)
     print(params)
-    a_v, q_v = evaluate(start_state, policy=q_policy_noval, params=params, image_fn=f"q_policy{i}.{j}.gif")
+    a_v, q_v = evaluate(start_state,
+                        policy=q_policy_noval,
+                        params=params,
+                        image_fn=f"q_policy{i}.{j}.gif")
     for a in a_v:
       a_vecs.append(a)
     for q in q_v:
       q_vecs.append(q)
- 
+
   print("Optimizing Q")
   a_vecs = np.stack(a_vecs, axis=0)
   q_vecs = np.stack(q_vecs, axis=0)
