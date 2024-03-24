@@ -231,52 +231,55 @@ key = jax.random.key(0)
 
 def run_episodes(iteration, num_episodes, params):
   step_avg = 0
-  a_vecs = []
+  s_a_vecs = []
   q_vecs = []
   print(i, "run:")
   for cur_episode in tqdm(range(0, num_episodes)):
     start_state = PoleCartState(x=0.0, v=0.0, theta=random.gauss() * 0.01 * pi, theta_dot=random.gauss() * 0.05)
-    episode_steps, a_v, q_v = evaluate(start_state,
+    episode_steps, s_a_v, q_v = evaluate(start_state,
                         policy=q_policy_noval,
                         params=params,
                         image_fn=None)#f"q_policy{iteration}.{cur_episode}.gif")
-    a_vecs.extend(a_v)
+    s_a_vecs.extend(s_a_v)
     q_vecs.extend(q_v)
     step_avg += episode_steps
 
   print(i, "avg:", step_avg / num_episodes)
 
-  a_vecs = np.stack(a_vecs, axis=0)
+  s_a_vecs = np.stack(s_a_vecs, axis=0)
   q_vecs = np.stack(q_vecs, axis=0)
-  return a_vecs, q_vecs
+  return s_a_vecs, q_vecs
 
 
 params = [0.2 * (np.random.random([7, 5]) - 0.5), 
           0.2 * (np.random.random([1,5])-0.5),
           0.2*np.random.random([5,1])]
 
-for i in range(0, 100):
-  a_vecs, q_vecs = run_episodes(i, num_episodes=10, params=params)
-
-  print("Optimizing Q")
-  predicted_qs = q_function(a_vecs, params)
-  predicted_qs = np.expand_dims(predicted_qs, axis=1)
-
+def optimize_model(s_a_vecs, q_vecs, params):
   def loss(params):
-    q_preds = q_function(a_vecs, params)
+    q_preds = q_function(s_a_vecs, params)
     loss = jnp.average((q_vecs - q_preds)**2)
     return loss
 
   it = 0
   l_old = None
+  params_new = params
   while True:
-    g = grad(loss)(params)
-    l = loss(params)
+    g = grad(loss)(params_new)
+    l = loss(params_new)
     if it % 100 == 0:
       print(f"{it}. loss=", l, l_old)
-      if l_old and l > 0.995 * l_old:
+      if l_old and l > 0.99 * l_old:
         break
       l_old = l
     it += 1
-    for k in range(len(params)):
-      params[k] = params[k] - 0.01 * g[k]
+    for k in range(len(params_new)):
+      params_new[k] = params_new[k] - 0.01 * g[k]
+  return params_new
+
+for i in range(0, 100):
+  s_a_vecs, q_vecs = run_episodes(i, num_episodes=10, params=params)
+  print("Optimizing Q")
+  params = optimize_model(s_a_vecs, q_vecs, params)
+
+
