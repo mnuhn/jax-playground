@@ -19,6 +19,8 @@ m_cart = 3.0
 eps = 0.01
 MAX_FORCE = 1.0
 MAX_STEP = 2000
+NUM_EPISODES = 50
+NUM_EPOCHS = 50
 
 ACTIONS = np.array([-MAX_FORCE, MAX_FORCE])  #arange(-MAX_FORCE, MAX_FORCE)
 
@@ -207,7 +209,7 @@ def evaluate(start_state, policy, params, image_fn=None):
     action_idxs.append(action_index)
     q_new = improved_q_value(state, action_index, state_new, params=params)
     if abs(state.vec[INDEX_THETA] - pi) < 0.75 * pi:
-      q_new = -1.0 * np.ones(ACTIONS.shape[0])
+      q_new = np.array(-1.0, dtype=float)
 
     improved_q_vec.append(q_new)
 
@@ -275,6 +277,8 @@ def optimize_model(s_vecs, a_idxs, q_vecs, params):
   def loss(params):
     # TODO:::::::::::::::: only use the action_index
     q_preds = q_function(s_vecs, params)  # shape(batch, action)
+    rows = np.arange(q_preds.shape[0])
+    q_preds = q_preds[rows, a_idxs]
     #print("loss", q_preds.shape, q_vecs.shape)
     #print("loss", q_preds[0], q_vecs[0])
     loss = jnp.average((q_vecs - q_preds)**2)
@@ -297,7 +301,9 @@ def optimize_model(s_vecs, a_idxs, q_vecs, params):
   return params_new
 
 
-for i in range(0, 100):
-  s_vecs, a_idxs, q_vecs = run_episodes(i, num_episodes=100, params=params)
+for i in range(0, NUM_EPOCHS):
+  s_vecs, a_idxs, q_vecs = run_episodes(i,
+                                        num_episodes=NUM_EPISODES,
+                                        params=params)
   print("Optimizing Q")
   params = optimize_model(s_vecs, a_idxs, q_vecs, params)
