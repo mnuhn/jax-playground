@@ -18,9 +18,9 @@ m_pole = 1.0
 m_cart = 3.0
 eps = 0.01
 MAX_FORCE = 1.0
-MAX_STEP=2000
+MAX_STEP = 2000
 
-ACTIONS = np.array([-MAX_FORCE, MAX_FORCE]) #arange(-MAX_FORCE, MAX_FORCE)
+ACTIONS = np.array([-MAX_FORCE, MAX_FORCE])  #arange(-MAX_FORCE, MAX_FORCE)
 
 INDEX_X = 0
 INDEX_V = 1
@@ -44,7 +44,9 @@ class PoleCartState:
     self.vec[INDEX_COS_THETA] = cos(theta)
 
   def __str__(self):
-    return (f"theta: {self.vec[INDEX_THETA]:.3f} theta': {self.vec[INDEX_THETA_DOT]:.3f}")
+    return (
+        f"theta: {self.vec[INDEX_THETA]:.3f} theta': {self.vec[INDEX_THETA_DOT]:.3f}"
+    )
 
 
 # Action: $a \in [-MAX_FORCE, MAX_FORCE]$
@@ -84,6 +86,7 @@ def move_opposite_upswing(state, params=None):
 def reward(state, action_index, state_new):
   return (cos(state_new.vec[INDEX_THETA]) - cos(state.vec[INDEX_THETA]))
 
+
 @jax.jit
 # Returns ACTION.shape[0] many outputs. Q value for each action.
 def q_function(state_vec, params):
@@ -101,7 +104,7 @@ def q_policy(state, params, explore=False):
   action_index = np.argmax(values)
 
   if explore and random.random() < 0.1:
-    action_index = random.randint(0,ACTIONS.shape[0]-1)
+    action_index = random.randint(0, ACTIONS.shape[0] - 1)
 
   #print("q_policy:", state, values)
 
@@ -117,12 +120,13 @@ def state_derivative(state, force):
   cos_theta = cos(state.vec[INDEX_THETA])
 
   a = m_pole * const_g * sin_theta * cos_theta
-  a -= 7 / 3 * (force + m_pole * const_l * state.vec[INDEX_THETA_DOT]**2 * sin_theta -
-                mu_c * state.vec[INDEX_V])
+  a -= 7 / 3 * (force + m_pole * const_l * state.vec[INDEX_THETA_DOT]**2 *
+                sin_theta - mu_c * state.vec[INDEX_V])
   a -= mu_p * state.vec[INDEX_THETA_DOT] * cos_theta / const_l
   a /= m_pole * cos_theta * cos_theta - 7 / 3 * (m_pole + m_cart)
   theta_dd = 3 / (7 * const_l) * (const_g * sin_theta - a * cos_theta -
-                            mu_p * state.vec[INDEX_THETA_DOT] / (m_pole * const_l))
+                                  mu_p * state.vec[INDEX_THETA_DOT] /
+                                  (m_pole * const_l))
 
   return np.array([state.vec[INDEX_THETA_DOT], theta_dd, state.vec[INDEX_V], a])
 
@@ -143,7 +147,8 @@ def time_step(state, force):
 def improved_q_value(state, action_idx, state_new, params):
   gamma = 0.95
   _, best_next_value = q_policy(state_new, params, explore=False)
-  improved_current_value = reward(state, action_idx, state_new) + gamma * best_next_value
+  improved_current_value = reward(state, action_idx,
+                                  state_new) + gamma * best_next_value
   return improved_current_value
 
 
@@ -224,6 +229,7 @@ def evaluate(start_state, policy, params, image_fn=None):
 
 key = jax.random.key(0)
 
+
 def run_episodes(iteration, num_episodes, params):
   step_avg = 0
   s_vecs = []
@@ -231,11 +237,13 @@ def run_episodes(iteration, num_episodes, params):
   q_vecs = []
   print(i, "run:")
   for cur_episode in tqdm(range(0, num_episodes)):
-    start_state = PoleCartState(x=0.0, v=random.gauss() * 0.01, theta=random.gauss() * 0.01 * pi, theta_dot=random.gauss() * 0.05)
-    episode_steps, state_vecs, action_idxs, q_v = evaluate(start_state,
-                        policy=q_policy_noval,
-                        params=params,
-                        image_fn=None)#f"q_policy{iteration}.{cur_episode}.gif")
+    start_state = PoleCartState(x=0.0,
+                                v=random.gauss() * 0.01,
+                                theta=random.gauss() * 0.01 * pi,
+                                theta_dot=random.gauss() * 0.05)
+    episode_steps, state_vecs, action_idxs, q_v = evaluate(
+        start_state, policy=q_policy_noval, params=params,
+        image_fn=None)  #f"q_policy{iteration}.{cur_episode}.gif")
     s_vecs.extend(state_vecs)
     a_idxs.extend(action_idxs)
     q_vecs.extend(q_v)
@@ -249,11 +257,14 @@ def run_episodes(iteration, num_episodes, params):
   return s_vecs, a_idxs, q_vecs
 
 
-params = [0.2 * (np.random.random([6, 25]) - 0.5), 
-          0.2 * (np.random.random([1,25])-0.5),
-          0.2 * (np.random.random([25, 25]) - 0.5), 
-          0.2 * (np.random.random([1,25])-0.5),
-          0.2*np.random.random([25,ACTIONS.shape[0]])]
+params = [
+    0.2 * (np.random.random([6, 25]) - 0.5),
+    0.2 * (np.random.random([1, 25]) - 0.5),
+    0.2 * (np.random.random([25, 25]) - 0.5),
+    0.2 * (np.random.random([1, 25]) - 0.5),
+    0.2 * np.random.random([25, ACTIONS.shape[0]])
+]
+
 
 def optimize_model(s_vecs, a_idxs, q_vecs, params):
   print("Optimizing Model")
@@ -263,7 +274,7 @@ def optimize_model(s_vecs, a_idxs, q_vecs, params):
 
   def loss(params):
     # TODO:::::::::::::::: only use the action_index
-    q_preds = q_function(s_vecs, params) # shape(batch, action)
+    q_preds = q_function(s_vecs, params)  # shape(batch, action)
     #print("loss", q_preds.shape, q_vecs.shape)
     #print("loss", q_preds[0], q_vecs[0])
     loss = jnp.average((q_vecs - q_preds)**2)
@@ -284,6 +295,7 @@ def optimize_model(s_vecs, a_idxs, q_vecs, params):
     for k in range(len(params_new)):
       params_new[k] = params_new[k] - 0.01 * g[k]
   return params_new
+
 
 for i in range(0, 100):
   s_vecs, a_idxs, q_vecs = run_episodes(i, num_episodes=100, params=params)
