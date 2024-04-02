@@ -31,12 +31,10 @@ def evaluate(start_state, policy, params, image_fn=None, explore_prob=0.0):
 
   while True:
     step += 1
-
-    action_index = policy(cur_state, params=params, explore_prob=explore_prob)
     states.append(cur_state)
 
-    # Merge into class.
-    state_new = state.time_step(cur_state, force=state.ACTIONS[action_index])
+    action_index = policy(cur_state, params=params, explore_prob=explore_prob)
+    state_new = cur_state.time_step(force=state.ACTIONS[action_index])
 
     new_states.append(state_new)
     action_idxs.append(action_index)
@@ -61,17 +59,17 @@ def evaluate(start_state, policy, params, image_fn=None, explore_prob=0.0):
 def run_episodes(iteration, num_episodes, params, explore_prob):
   reward_avg = 0
   states = []
-  new_states = []
   a_idxs = []
+  new_states = []
   q_vecs = []
-  print(i, "run:")
+  print(f"Iteration {iteration}")
   for cur_episode in tqdm(range(0, num_episodes)):
     start_state = state.random_state()
     if cur_episode < 5:
-      image_fn = f"q_policy{iteration}.{cur_episode}.gif"
+      image_fn = f"gifs/q_policy{iteration}.{cur_episode}.gif"
     else:
       image_fn = None
-    episode_steps, cur_states, action_idxs, cur_new_states = evaluate(
+    episode_steps, cur_states, cur_action_idxs, cur_new_states = evaluate(
         start_state,
         policy=q_policy.q_policy_noval,
         params=params,
@@ -79,18 +77,18 @@ def run_episodes(iteration, num_episodes, params, explore_prob):
         explore_prob=explore_prob)
 
     states.extend(cur_states)
-    a_idxs.extend(action_idxs)
+    a_idxs.extend(cur_action_idxs)
     new_states.extend(cur_new_states)
 
     r_episode = 0.0
     for k in range(0, len(cur_states)):
-      r = state.reward(states[k], a_idxs[k], new_states[k])
+      r = states[k].reward(a_idxs[k], new_states[k])
       r_episode += r
     r_episode /= len(cur_states)
 
     reward_avg += r_episode
 
-  print(i, "avg:", reward_avg / num_episodes)
+  print(f"{iteration}: Average reward {reward_avg / num_episodes}")
 
   return states, a_idxs, new_states
 
@@ -99,31 +97,28 @@ start_state = state.PoleCartState(x=0.0,
                                   v=0.0,
                                   theta=0.25 * 3.14,
                                   theta_dot=0.0)
-next_state = state.time_step(start_state, force=10)
-print("reward1:", state.reward(start_state, None, next_state))
+next_state = start_state.time_step(force=10)
+print("reward1:", start_state.reward(None, next_state))
 
-next_state = state.time_step(start_state, force=-10)
-print("reward2:", state.reward(start_state, None, next_state))
+next_state = start_state.time_step(force=-10)
+print("reward2:", start_state.reward(None, next_state))
 
-s_vecs_all = []
-a_idxs_all = []
-q_vecs_all = []
-explore_prob = 1.0
-gamma = 0.0
-
-# TODO: Merge data from multiple episodes.
-# Keep early episodes (states)
-# Stratified Sampling for Training Data.
 all_states = []
 all_a_idxs = []
 all_new_states = []
 
+explore_prob = 1.0
+gamma = 0.0
+
 params = q_policy.random_params()
 
-for i in range(0, NUM_EPOCHS):
-  print(f"explore_prob={explore_prob}, gamma={gamma}")
+for epoch in range(0, NUM_EPOCHS):
+  print(f"epoch={epoch} explore_prob={explore_prob}, gamma={gamma}")
   next_states, next_a_idxs, next_new_states = run_episodes(
-      i, num_episodes=NUM_EPISODES, params=params, explore_prob=explore_prob)
+      epoch,
+      num_episodes=NUM_EPISODES,
+      params=params,
+      explore_prob=explore_prob)
 
   print("shuffle data")
   c = list(zip(all_states, all_a_idxs, all_new_states))
@@ -160,11 +155,11 @@ for i in range(0, NUM_EPOCHS):
   improved_q_vec = np.stack(improved_q_vec, axis=0)
 
   print("Optimizing Q")
-  params = q_policy.optimize_model(i,
+  params = q_policy.optimize_model(epoch,
                                    s_vecs,
                                    a_idxs,
                                    improved_q_vec,
                                    params=params)
   explore_prob *= 0.95
-  if i >= 10 and i % 10 == 0:
+  if epoch >= 10 and epoch % 10 == 0:
     gamma += 0.05

@@ -35,6 +35,41 @@ class PoleCartState:
 
     self.step = step
 
+  def derivative(self, force):
+    a = m_pole * const_g * self.vec[INDEX_SIN_THETA] * self.vec[INDEX_COS_THETA]
+    a -= 7 / 3 * (force + m_pole * const_l * self.vec[INDEX_THETA_DOT]**2 *
+                  self.vec[INDEX_SIN_THETA] - mu_c * self.vec[INDEX_V])
+    a -= mu_p * self.vec[INDEX_THETA_DOT] * self.vec[INDEX_COS_THETA] / const_l
+    a /= m_pole * self.vec[INDEX_SIN_THETA] * self.vec[
+        INDEX_COS_THETA] - 7 / 3 * (m_pole + m_cart)
+    theta_dd = 3 / (7 * const_l) * (const_g * self.vec[INDEX_SIN_THETA] -
+                                    a * self.vec[INDEX_COS_THETA] -
+                                    mu_p * self.vec[INDEX_THETA_DOT] /
+                                    (m_pole * const_l))
+
+    return np.array([self.vec[INDEX_THETA_DOT], theta_dd, self.vec[INDEX_V], a])
+
+  def time_step(self, force):
+    _, theta_dd, _, a = self.derivative(force=force)
+    theta = self.vec[INDEX_THETA] + self.vec[
+        INDEX_THETA_DOT] * eps + 1 / 2 * theta_dd * eps**2
+    theta_d = self.vec[INDEX_THETA_DOT] + theta_dd * eps
+    x = self.vec[INDEX_X] + self.vec[INDEX_V] * eps + 1 / 2 * a * eps**2
+    v = self.vec[INDEX_V] + a * eps
+
+    return PoleCartState(x=x,
+                         v=v,
+                         theta=theta,
+                         theta_dot=theta_d,
+                         step=self.step + 1)
+
+  # Use the delta in y component above zero as reward.
+  def reward(self, action_index, state_new):
+    result = state_new.vec[INDEX_COS_THETA]
+    weight = 0.1 * min(0.0, state_new.vec[INDEX_COS_THETA] - 0.8)
+    result -= weight * state_new.vec[INDEX_THETA_DOT]
+    return result
+
   def __str__(self):
     return (
         f"theta: {self.vec[INDEX_THETA]:.3f} theta': {self.vec[INDEX_THETA_DOT]:.3f}"
@@ -47,42 +82,3 @@ def random_state():
       v=0.0,  #random.gauss() * 0.1,
       theta=random.random() * 2 * pi,
       theta_dot=random.gauss() * 0.001)
-
-
-# Use the delta in y component above zero as reward.
-def reward(state, action_index, state_new):
-  result = cos(state_new.vec[INDEX_THETA])
-  weight = 0.1 * min(0.0, cos(state_new.vec[INDEX_THETA]) - 0.8)
-  result -= weight * state_new.vec[INDEX_THETA_DOT]
-  return result
-
-
-def time_step(state, force):
-  _, theta_dd, _, a = state_derivative(state, force=force)
-  theta = state.vec[INDEX_THETA] + state.vec[
-      INDEX_THETA_DOT] * eps + 1 / 2 * theta_dd * eps**2
-  theta_d = state.vec[INDEX_THETA_DOT] + theta_dd * eps
-  x = state.vec[INDEX_X] + state.vec[INDEX_V] * eps + 1 / 2 * a * eps**2
-  v = state.vec[INDEX_V] + a * eps
-
-  return PoleCartState(x=x,
-                       v=v,
-                       theta=theta,
-                       theta_dot=theta_d,
-                       step=state.step + 1)
-
-
-def state_derivative(state, force):
-  sin_theta = sin(state.vec[INDEX_THETA])
-  cos_theta = cos(state.vec[INDEX_THETA])
-
-  a = m_pole * const_g * sin_theta * cos_theta
-  a -= 7 / 3 * (force + m_pole * const_l * state.vec[INDEX_THETA_DOT]**2 *
-                sin_theta - mu_c * state.vec[INDEX_V])
-  a -= mu_p * state.vec[INDEX_THETA_DOT] * cos_theta / const_l
-  a /= m_pole * cos_theta * cos_theta - 7 / 3 * (m_pole + m_cart)
-  theta_dd = 3 / (7 * const_l) * (const_g * sin_theta - a * cos_theta -
-                                  mu_p * state.vec[INDEX_THETA_DOT] /
-                                  (m_pole * const_l))
-
-  return np.array([state.vec[INDEX_THETA_DOT], theta_dd, state.vec[INDEX_V], a])

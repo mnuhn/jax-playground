@@ -14,7 +14,7 @@ key = jax.random.key(0)
 
 
 def random_params():
-  dims = [5, 100, 100, 100, state.ACTIONS.shape[0]]
+  dims = [5, 128, 128, state.ACTIONS.shape[0]]
   params = []
   for i in range(0, len(dims) - 1):
     params.append(
@@ -30,8 +30,7 @@ def q_function(state_vecs, params):
   #jax.debug.print("{state_vecs.shape}", state_vecs=state_vecs)
   layer1 = jax.nn.relu(state_vecs[:, 1:] @ params[0] + params[1])
   layer2 = jax.nn.relu(layer1 @ params[2] + params[3])
-  layer3 = jax.nn.relu(layer2 @ params[4] + params[5])
-  result = jax.nn.tanh(layer3 @ params[6] + params[7])
+  result = layer2 @ params[4] + params[5]
   #jax.debug.print("{result.shape}", result=result)
   return result
 
@@ -60,7 +59,7 @@ def q_policy_noval(cur_state, params, explore_prob=0.0):
 # REMOVE action_idx - use all
 # Q^{*}(s,a) = \sum\limits_{s'} p(s'|s,a) \left[ r(s,a,s') + \gamma \max\limits_{a'} Q^{*}(s',a')\right]
 def improved_q_value(cur_state, action_idx, state_new, gamma, params):
-  r = state.reward(cur_state, action_idx, state_new)
+  r = cur_state.reward(action_idx, state_new)
   improved_current_value = r
   if gamma > 0.0:
     _, best_next_value = q_policy(state_new, params, explore_prob=0.0)
