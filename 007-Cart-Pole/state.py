@@ -1,0 +1,88 @@
+from math import sin, cos, pi
+import numpy as np
+import random
+
+MAX_FORCE = 25.0
+ACTIONS = np.array([-MAX_FORCE, MAX_FORCE])  #arange(-MAX_FORCE, MAX_FORCE)
+
+INDEX_X = 0
+INDEX_V = 1
+INDEX_THETA = 2
+INDEX_THETA_DOT = 3
+INDEX_SIN_THETA = 4
+INDEX_COS_THETA = 5
+
+const_l = 3
+mu_c = 3.0
+mu_p = 2.0
+const_g = 9.81
+m_pole = 1.0
+m_cart = 3.0
+eps = 0.01
+
+
+class PoleCartState:
+
+  def __init__(self, x, v, theta, theta_dot, step=0):
+    self.vec = np.zeros(6)
+    self.vec[INDEX_X] = x
+    self.vec[INDEX_V] = v
+    self.vec[INDEX_THETA] = theta % (2 * pi)
+    self.vec[INDEX_THETA_DOT] = theta_dot
+
+    self.vec[INDEX_SIN_THETA] = sin(theta)
+    self.vec[INDEX_COS_THETA] = cos(theta)
+
+    self.step = step
+
+  def __str__(self):
+    return (
+        f"theta: {self.vec[INDEX_THETA]:.3f} theta': {self.vec[INDEX_THETA_DOT]:.3f}"
+    )
+
+
+def random_state():
+  return PoleCartState(
+      x=0.0,
+      v=0.0,  #random.gauss() * 0.1,
+      theta=random.random() * 2 * pi,
+      theta_dot=random.gauss() * 0.001)
+
+
+# Use the delta in y component above zero as reward.
+def reward(state, action_index, state_new):
+  result = cos(state_new.vec[INDEX_THETA])
+  weight = 0.1 * min(0.0, cos(state_new.vec[INDEX_THETA]) - 0.8)
+  result -= weight * state_new.vec[INDEX_THETA_DOT]
+  return result
+
+
+def time_step(state, force):
+  _, theta_dd, _, a = state_derivative(state, force=force)
+  theta = state.vec[INDEX_THETA] + state.vec[
+      INDEX_THETA_DOT] * eps + 1 / 2 * theta_dd * eps**2
+  theta_d = state.vec[INDEX_THETA_DOT] + theta_dd * eps
+  x = state.vec[INDEX_X] + state.vec[INDEX_V] * eps + 1 / 2 * a * eps**2
+  v = state.vec[INDEX_V] + a * eps
+
+  return PoleCartState(x=x,
+                       v=v,
+                       theta=theta,
+                       theta_dot=theta_d,
+                       step=state.step + 1)
+
+
+def state_derivative(state, force):
+  sin_theta = sin(state.vec[INDEX_THETA])
+  cos_theta = cos(state.vec[INDEX_THETA])
+
+  a = m_pole * const_g * sin_theta * cos_theta
+  a -= 7 / 3 * (force + m_pole * const_l * state.vec[INDEX_THETA_DOT]**2 *
+                sin_theta - mu_c * state.vec[INDEX_V])
+  a -= mu_p * state.vec[INDEX_THETA_DOT] * cos_theta / const_l
+  a /= m_pole * cos_theta * cos_theta - 7 / 3 * (m_pole + m_cart)
+  theta_dd = 3 / (7 * const_l) * (const_g * sin_theta - a * cos_theta -
+                                  mu_p * state.vec[INDEX_THETA_DOT] /
+                                  (m_pole * const_l))
+
+  return np.array([state.vec[INDEX_THETA_DOT], theta_dd, state.vec[INDEX_V], a])
