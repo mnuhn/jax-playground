@@ -14,7 +14,7 @@ key = jax.random.key(0)
 
 
 def random_params():
-  dims = [5, 128, 128, state.ACTIONS.shape[0]]
+  dims = [5, 128, 128, 128, 128, state.ACTIONS.shape[0]]
   params = []
   for i in range(0, len(dims) - 1):
     params.append(
@@ -30,7 +30,9 @@ def q_function(state_vecs, params):
   #jax.debug.print("{state_vecs.shape}", state_vecs=state_vecs)
   layer1 = jax.nn.relu(state_vecs[:, 1:] @ params[0] + params[1])
   layer2 = jax.nn.relu(layer1 @ params[2] + params[3])
-  result = layer2 @ params[4] + params[5]
+  layer3 = jax.nn.relu(layer2 @ params[4] + params[5])
+  layer4 = jax.nn.tanh(layer3 @ params[6] + params[7])
+  result = jax.nn.tanh(layer4 @ params[8] + params[9])
   #jax.debug.print("{result.shape}", result=result)
   return result
 
@@ -64,7 +66,7 @@ def improved_q_value(cur_state, action_idx, state_new, gamma, params):
   if gamma > 0.0:
     _, best_next_value = q_policy(state_new, params, explore_prob=0.0)
 
-    if abs(state.vec[INDEX_THETA] - pi) < 0.5 * pi:
+    if abs(state_new.vec[state.INDEX_THETA] - pi) < 0.5 * pi:
       best_next_value = 0.0
 
     improved_current_value += gamma * best_next_value
@@ -80,8 +82,11 @@ def optimize_model(epoch, s_vecs, a_idxs, q_vecs, params=None):
   summary_writer = tensorboard.SummaryWriter(f"./tensorboard/{epoch}")
   print("Optimizing Model")
   print("s_vecs:", s_vecs.shape)
+  print(s_vecs[0:5])
   print("a_idxs:", a_idxs.shape)
+  print(a_idxs[0:5])
   print("q_vecs:", q_vecs.shape)
+  print(q_vecs[0:5])
 
   TEST_SPLIT = 2000
   assert len(s_vecs) > 2 * TEST_SPLIT
@@ -104,8 +109,8 @@ def optimize_model(epoch, s_vecs, a_idxs, q_vecs, params=None):
     loss = jnp.average((Q - Q_preds)**2)**0.5
     return loss
 
-  batch_size = 512
-  tx = optax.adam(learning_rate=0.005)
+  batch_size = 128
+  tx = optax.adam(learning_rate=0.001)
   opt_state = tx.init(params)
   patience = 3 * int(len(train_S) / batch_size)
   print(f"patience: {patience}")
