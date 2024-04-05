@@ -64,8 +64,15 @@ class PoleCartState:
                          step=self.step + 1)
 
   # Use the delta in y component above zero as reward.
+  # Use the distance to 0
   def reward(self, action_index, state_new):
-    result = state_new.vec[INDEX_COS_THETA]
+    result = abs(state_new.vec[INDEX_THETA] % (2 * pi) - pi)
+    result -= 0.1 * abs(state_new.vec[INDEX_X])
+
+    #assert result > 0
+    #assert result < pi
+
+    #result = state_new.vec[INDEX_COS_THETA]
     #weight = 0.1 * min(0.0, state_new.vec[INDEX_COS_THETA] - 0.8)
     #result -= weight * state_new.vec[INDEX_THETA_DOT]
     return result
@@ -88,5 +95,5 @@ def random_upright_state():
   return PoleCartState(
       x=0.0,
       v=0.0,  #random.gauss() * 0.1,
-      theta=random.random() * 0.5 * pi - 0.25 * pi,
+      theta=random.random() * 0.1 * pi - 0.05 * pi,
       theta_dot=random.gauss() * 0.001)
