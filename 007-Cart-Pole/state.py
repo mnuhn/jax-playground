@@ -66,8 +66,12 @@ class PoleCartState:
   # Use the delta in y component above zero as reward.
   # Use the distance to 0
   def reward(self, action_index, state_new):
-    result = abs(state_new.vec[INDEX_THETA] % (2 * pi) - pi)
-    result -= 0.1 * abs(state_new.vec[INDEX_X])
+    result = pi - abs(state_new.vec[INDEX_THETA] % (2 * pi) - pi)
+    if result < pi / 4:
+      return 1.0
+    else:
+      return 0.0
+    #result -= 0.1 * abs(state_new.vec[INDEX_X])
 
     #assert result > 0
     #assert result < pi
@@ -75,7 +79,6 @@ class PoleCartState:
     #result = state_new.vec[INDEX_COS_THETA]
     #weight = 0.1 * min(0.0, state_new.vec[INDEX_COS_THETA] - 0.8)
     #result -= weight * state_new.vec[INDEX_THETA_DOT]
-    return result
 
   def __str__(self):
     return (

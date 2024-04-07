@@ -2,6 +2,8 @@
 
 Based on https://sharpneat.sourceforge.io/research/cart-pole/cart-pole-equations.html
 
+For Experiments, scroll down.
+
 ## Trajectories for simple policy
 I show two examples:
 
@@ -129,4 +131,74 @@ When we know the models $p(s,a,s')$ and $r(s,a,s')$:
 2. Evaluate Policy, i.e. compute $V^{\pi}(s)$
 3. Optimize policy: for all states, choose new $\tilde\pi(s) = \arg\max\limits_{a} \sum\limits_{s'} p(s'|s,a) [ r(s,a,s') + \gamma V^{\pi}(s') ]$
 
-### TODO: Monte Carlo Methods, Model-Free Methods
+## Experiments
+
+UNDER CONSTRUCTION
+
+### Replay Buffer
+
+I implement a simple cache of past episodes. Each episode generates a list of
+states, eventually ending after MAX_ITERATIONS or when the reward is 0.
+
+This list of states (and actions) is added to a replay buffer. Before a new
+episode is run, the old replay buffer is shuffled and trimmed to
+REPLAY_CACHE_MAX_KEEP. Then, the new states are added (from the current
+episode). Then the new buffer is shuffled again and trimmed to
+REPLAY_CACHE_MAX_TOTAL.
+
+This is to ensure the number of training examples cannot explore, while still
+keeping past experiences/episodes available.
+
+### Reward
+
+#### First Try: $r=\cos(\theta)$
+I first started of with using $cos(\theta)$ as the immediate reward. I first
+started off with Deep-Q Learning (see below) - for which this reward did not
+work well (I set $\gamma=0$): In order to pick the right action, the prediction
+of the $cos(\theta)$ need to be extremely accurate. I was able to get the model
+to predict this reward accurately enough, but it needed a lot of training
+interations and some other tricks (predicting only the delta to the current
+states angle theta).
+
+#### Second Try: $r=+1$ if upright, $r=0$ otherwise
+I then switched to this simpler reward. This is conceptually simpler and worked
+well for the discrete q learning (still need to make it work for deep q
+learning).
+
+### Discrete Q Learning (discretize the state space)
+
+The idea is to discretize the state space, and to then learn a table function.
+While the state space is discretized, the physics operate still on the
+non-discrete state space.
+
+When implementing an $\epsilon$-greedy policy, I first applied exploration on
+the continuous state space. This meant that in a given "cell", during one
+episode, I would do random action for every time step. A key change that made
+things work was to decide for a random action once the simulation enters a
+"cell", and to then keep that action constant until the simulation enters a new
+"cell".
+
+```
+python3 equations.py \
+  --num_episodes=10 \
+  --max_episode_steps=1000 \
+  --q_model_dim=90 \
+  --rl_gamma=0.8 \
+  --rl_alpha=1.0 \
+  --rl_explore_prob_init=1.0 \
+  --rl_explore_prob_decay=0.6 
+```
+
+
+### Deep-Q Learning
+
+Here, the state-space is not discretized and a neural network is learned that
+directly takes the state variables as input and predicts the Q values.
+
+I got something working - but the current state of the code is broken. Some
+problems I ran into along the way:
+
+* I first tried to train a model $Q(state, action)$, i.e. the action is an
+  input to the network. However, this didn't work well.
+* Only then I moved to training models $Q_action(state)$ - so essentially 1 NN
+  per possible action.
