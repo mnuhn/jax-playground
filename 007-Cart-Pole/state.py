@@ -67,7 +67,7 @@ class PoleCartState:
   # Use the distance to 0
   def reward(self, action_index, state_new):
     result = pi - abs(state_new.vec[INDEX_THETA] % (2 * pi) - pi)
-    if result < pi / 4:
+    if result < pi / 18: # < 10 degrees
       return 1.0
     else:
       return 0.0
