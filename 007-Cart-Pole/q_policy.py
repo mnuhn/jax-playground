@@ -69,8 +69,8 @@ def q_policy(cur_state, params, explore_prob=0.0):
     action_index = random.randint(0, state.ACTIONS.shape[0] - 1)
   #print("q_policy:", state, values)
 
-  if cur_state.step < 5 and explore_prob == 0:
-    print("qfunction", cur_state, values, action_index)
+  #if cur_state.step < 5 and explore_prob == 0:
+  #  print("qfunction", cur_state, values, action_index)
 
   return action_index, values[0][action_index]
 
@@ -99,7 +99,7 @@ def optimize_model(epoch, s_vecs, a_idxs, q_vecs, alpha, params):
 
   s_idxs = idxs(s_vecs, params)
 
-  for s_idx in tqdm(jnp.unique(s_idxs, axis=0)):
+  for s_idx in tqdm(jnp.unique(s_idxs, axis=0), desc="Optimize Q"):
     s_mask = (s_idxs == s_idx).all(axis=1)
     for a_idx in jnp.unique(a_idxs[s_mask]):
       a_mask = (a_idxs == a_idx) & s_mask

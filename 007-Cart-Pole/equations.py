@@ -86,8 +86,7 @@ def run_episodes(iteration, num_episodes, params, explore_prob):
   a_idxs = []
   new_states = []
   q_vals = []
-  print(f"Iteration {iteration}")
-  for cur_episode in tqdm(range(num_episodes)):
+  for cur_episode in tqdm(range(num_episodes), desc=f"Iteration {iteration}"):
     start_state = state.random_upright_state()
     if cur_episode < 5:
       image_fn = f"gifs/q_policy{iteration}.{cur_episode}.gif"
@@ -142,7 +141,6 @@ buffered_episodes = []
 for epoch in range(p.num_rl_epochs):
   print(f"epoch={epoch} explore_prob={explore_prob}, gamma={p.rl_gamma}")
 
-  print("shuffle data")
   random.shuffle(buffered_episodes)
 
   if len(buffered_episodes) > p.replay_buffer_max_keep:
@@ -164,14 +162,13 @@ for epoch in range(p.num_rl_epochs):
         f"limit overall data ({len(buffered_episodes)}) to {p.replay_buffer_max_total}"
     )
     buffered_episodes = buffered_episodes[:p.replay_buffer_max_total]
-  print("done")
 
   gamma = p.rl_gamma
   alpha = p.rl_alpha
-  print(f"gamma={gamma} alpha={alpha}")
-  print("Compute improved q values")
   improved_q_vec = []
-  for ii in tqdm(range(len(buffered_episodes))):
+  for ii in tqdm(
+      range(len(buffered_episodes)),
+      desc=f"Compute improved q values: gamma={gamma} alpha={alpha}"):
     q_new = q_policy.improved_q_value(cur_state=buffered_episodes[ii][0],
                                       action_idx=buffered_episodes[ii][1],
                                       state_new=buffered_episodes[ii][2],
@@ -184,7 +181,6 @@ for epoch in range(p.num_rl_epochs):
   sn_vecs = np.stack([entry[2].vec for entry in buffered_episodes], axis=0)
   q_vecs = np.stack(improved_q_vec, axis=0)
 
-  print("Optimizing Q")
   params = q_policy.optimize_model(
       epoch,
       s_vecs,
