@@ -1,4 +1,7 @@
-# RL for Balancing a Pole on a Cart
+# RL for Balancing a Pole on a Cart - Discrete $Q(a,s)$
+
+See also my implementation using a neural $Q_a(s)$
+[here](../008-Cart-Pole-Neural-Q/).
 
 Physics simulation is based on
 https://sharpneat.sourceforge.io/research/cart-pole/cart-pole-equations.html
@@ -153,15 +156,3 @@ well for the discrete q learning (still need to make it work for deep q
 learning).
 
 
-### Deep-Q Learning
-
-Here, the state-space is not discretized and a neural network is learned that
-directly takes the state variables as input and predicts the Q values.
-
-I got something working - but the current state of the code is broken. Some
-problems I ran into along the way:
-
-* I first tried to train a model $Q(s, a)$, i.e. the action is an
-  input to the network. However, this didn't work well.
-* Only then I moved to training models $Q_a(s)$ - so essentially 1 NN
-  per possible action.
