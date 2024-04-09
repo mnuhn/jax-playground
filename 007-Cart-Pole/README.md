@@ -1,6 +1,7 @@
 # RL for Balancing a Pole on a Cart
 
-Physics simulation is based on https://sharpneat.sourceforge.io/research/cart-pole/cart-pole-equations.html
+Physics simulation is based on
+https://sharpneat.sourceforge.io/research/cart-pole/cart-pole-equations.html
 
 If you do nothing, the pole just drops:
 
@@ -110,6 +111,16 @@ Average steps in 10 episodes: 1000.1
 General theory - see [notes](./MarkovDecisionProcess.md).
 
 UNDER CONSTRUCTION
+
+The current implementation is quite convoluted: I started trying to implement a
+neural Q function - but then changed things to learn a Q table. The current
+implementation has a quite arbitrary definition on when the agent can change
+the action (see below). This should be changed. Also, I'm quite sure things
+would be a lot faster if the Q table gets updated while the episodes are
+running - instead of first collecting all the data from the episodes, and to
+then update the Q table. This comes from the fact that the implementation is
+compatible with learning a neural Q function (which needs all training examples
+first).
 
 ### Replay Buffer
 
