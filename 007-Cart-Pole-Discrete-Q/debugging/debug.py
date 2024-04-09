@@ -1,3 +1,6 @@
+import sys
+sys.path.append('..')
+
 import q_policy
 import state
 import numpy as np
