@@ -1,137 +1,113 @@
-# Cart Pole Physics
+# RL for Balancing a Pole on a Cart
 
-Based on https://sharpneat.sourceforge.io/research/cart-pole/cart-pole-equations.html
+Physics simulation is based on https://sharpneat.sourceforge.io/research/cart-pole/cart-pole-equations.html
 
-For Experiments, scroll down.
-
-## Trajectories for simple policy
-I show two examples:
-
-1. Pole is slightly out of balance, but without any angular speed
-2. Pole is slightly out of balance, with some angular speed
-
-### Noop policy
-This policy does nothing: the force on the cart is always 0.
+If you do nothing, the pole just drops:
 
 <img src="gif/move_nothing.gif">
 <img src="gif/move_nothing2.gif">
 
-### Constant force policy
-This policy applies a constant force to the cart.
+The goal is to apply some force to the cart to keep the pole upright. See
+[here](HandcodedPolicies.md) for some handcoded policies.
 
-<img src="gif/move_constant.gif">
-<img src="gif/move_constant2.gif">
+## State Space
+The state of the system is described by the following variables:
+* $x$ - position of the cart
+* $v$ - speed of the cart
+* $\phi$ - angle of the pole
+* $\dot\phi$ - speed of the angle of the pole
 
-### Random force policy
-This policy applies a random force to the cart.
+## Actions
+The action space is simple: Either move left, or move right with a fixed force.
 
-<img src="gif/move_random.gif">
-<img src="gif/move_random2.gif">
+## Discrete Q Learning
 
-### Move opposite policy
-This policy applies a force based on the pole's angle. If it's "on the
-right", apply a force to the right, and vice versa.
+The idea is to discretize the state space, and to then learn a table function
+$Q(s,a$).
 
-<img src="gif/move_opposite.gif">
-<img src="gif/move_opposite2.gif">
+In the example below, I divide the state space into $180$ parts for the angle
+$phi$. I ignore the other varibles. This means that the action to be taken
+depends only on the current angle, and the algorithm cannot make a different
+decision based on the cart position, speed, or angle speed of the pole.
 
-### Move opposite (improved) policy
-Similar to the previous one, but try to "swing the pole up" when it's in the
-lower half.
+Note: While the state space is discretized, the physics operate still on the
+non-discrete state space.
 
-<img src="gif/move_opposite_upswing.gif">
-<img src="gif/move_opposite_upswing2.gif">
+When implementing an $\epsilon$-greedy policy, I first applied exploration on
+the continuous state space. This meant that in a given state-space-cell, during
+one episode, I would do random action for every time step. A key change that
+made things work was to decide for a random action once the simulation enters a
+state-space-cell, and to then keep that action constant until the simulation
+enters a new state-space-cell.
 
-## Recap: Markov Decision Process
+```
+python3 train.py \
+  --num_episodes=10 \
+  --max_episode_steps=1000 \
+  --q_model_dim=180 \
+  --rl_gamma=0.8 \
+  --rl_alpha=0.8 \
+  --rl_explore_prob_init=1.0 \
+  --rl_explore_prob_decay=0.6 
+```
 
-Based on https://www.cs.cmu.edu/~mgormley/courses/10601-s17/slides/lecture26-ri.pdf
+* Reward: $1.0 \text{ if } \theta < 10°, 0.0 \text{ otherwise }$
+* Run $10$ episodes per iteration
+* Run a maximum of $1000$ steps per episode
+* Stop when reward is $0$.
+* Perform a random action with probability $p$, start with $p=1.0$
+* After every iteration, lower the probability of a random action by a factor of $0.6$
+* Use $\gamma=0.8$ for discounting future rewards
+* Use $\alpha=0.8$, i.e. update $Q(s,a) \rightarrow (1-\alpha) Q_{old}(s,a) + \alpha Q_{new}(s,a)$
 
-### Definitions
 
-Markov Decision Process = RL Framework + Markov Assumption
+### Iteration 0 ($p=1.00$, $\gamma=0.8$)
 
-* States $S$, sequence $s_0^T = (s_0, s_1, ..., s_T)$
-* Actions $A$, sequence $a_0^T = (a_0, a_1, ..., a_T)$
-* Markov assumption: $p(s_{t+1}|s_0^t, a_0^t) = p(s_{t+1}|s_t,a_t)$
-* Reward assumption: $r(s_0^{t+1}, a_0^t) = r(s_t, a_t, s_{t+1}) = r_{t+1}$
-* Policy: $\pi(s_t|a_t) = p(a_t|s_t)$
+<img src="run-01/q_policy0.0.gif">
+<img src="run-01/q_policy0.1.gif">
 
-Goal: Find the optimal policy
-$$
-\tilde \pi = \arg\max\limits_{\pi} \sum_{t=0}^{\infty} \gamma^t r_t
-$$
+Average steps in 10 episodes: 160.7 
 
-Discount rate $\gamma$ is introduced to make the reward finite.
+### Iteration 1 ($p=0.50$, $\gamma=0.8$)
+<img src="run-01/q_policy1.0.gif">
+<img src="run-01/q_policy1.1.gif">
 
-The value function computes the expected discouted rewards of state $s$ when
-following policy $\pi$. It can be rewritten by taking into account the Markov
-assumption:
+Average steps in 10 episodes: 217.7 
 
-$$
-\begin{eqnarray}
-V^\pi(s) &=& \sum\limits_{a_0^T,s_0^T|s_0=s} p(s_0^T, a_0^T) \sum\limits_{t=0}^{\infty} \gamma^t r(s_t, a_t, s_{t+1})\\
-         &=& \sum\limits_{a} \pi(a|s) \sum\limits_{s'} p(s'|s,a) [ r(s,a,s') + \gamma V^{\pi}(s')]
-\end{eqnarray}
-$$
+### Iteration 2 ($p=0.25$, $\gamma=0.8$)
+<img src="run-01/q_policy2.0.gif">
+<img src="run-01/q_policy2.1.gif">
 
-A similar calculation can be done for the Action-Value Function $Q^\pi(s,a)$,
-which computes the expected discounted rewards following policy $\pi$ after
-taking action $a$ from state $s$:
+Average steps in 10 episodes: 225.6 
 
-$$
-\begin{eqnarray}
-Q^\pi(s,a) &=& \sum\limits_{\stackrel{s_0^T}{s_0=s}}  \sum\limits_{\stackrel{a_0^T}{a_0=a}} p(s_0^T, a_0^T) \sum\limits_{t=0}^{\infty} \gamma^t r(s_t, a_t, s_{t+1})\\
-           &=& \sum\limits_{a} \pi(a|s) \sum\limits_{s'} p(s'|s,a) [ r(s,a,s') + \gamma \sum\limits_{a'} \pi(a'|s') Q^{\pi}(s',a')]
-\end{eqnarray}
-$$
+### Iteration 3 ($p=0.13$, $\gamma=0.8$)
+<img src="run-01/q_policy3.0.gif">
+<img src="run-01/q_policy3.1.gif">
 
-### Relationships between $Q$ and $V$
-The following relationships hold:
-$$
-\begin{eqnarray}
-V^{\pi}(s) &=& \sum\limits_{a} \pi(a|s) Q^{\pi}(s,a)\\
-Q^{\pi}(s,a) &=& \sum\limits_{s'} p(s'|s,a) \left[ r(s,a,s') + \gamma V^{\pi}(s') \right]
-\end{eqnarray}
-$$
+Average steps in 10 episodes: 652.3 
 
-Optimal action-value function:
-$$
-Q^{*}(s,a) = \max\limits_{\pi} Q^{\pi}(s,a)
-$$
+### Iteration 4 ($p=0.06$, $\gamma=0.8$)
+<img src="run-01/q_policy4.0.gif">
+<img src="run-01/q_policy4.1.gif">
 
-Bellman optimality equation for $Q^*$:
+Average steps in 10 episodes: 632.7 
 
-$$
-Q^{*}(s,a) = \sum\limits_{s'} p(s'|s,a) \left[ r(s,a,s') + \gamma \max\limits_{a'} Q^{*}(s',a')\right]
-$$
+### Iteration 5 ($p=0.03$, $\gamma=0.8$)
+<img src="run-01/q_policy5.0.gif">
+<img src="run-01/q_policy5.1.gif">
 
-TODO: If we have $Q^{*}$, then we can get the optimal policy by using a greedy algorithm ?
+Average steps in 10 episodes: 1000.1 
 
-### Typical RL Tasks
+### Iteration 6 ($p=0.02$, $\gamma=0.8$)
+<img src="run-01/q_policy6.0.gif">
+<img src="run-01/q_policy6.1.gif">
 
-#### Task: Given a policy $\pi$ what is $V^{\pi}(s)$ and $Q^{\pi}(s,a)$
-This can be done by iteratively applying
-$$
-V^{k+1}(s) = \sum\limits_{a} \pi(a|s) \sum\limits_{s'} p(s'|s,a) [ r(s,a,s') + \gamma V^{k}(s')].
-$$
+Average steps in 10 episodes: 1000.1 
 
-We can start with $V^k(s)$ being arbitrary.
 
-#### Task: Find an improved policy $\pi' > \pi$ such that $V^{\pi'}(s) > V^{\pi}(s) \forall s$
-Choose new $\tilde\pi(s) = \arg\max\limits_{a} \sum\limits_{s'} p(s'|s,a) [ r(s,a,s') + \gamma V^{\pi}(s') ]$
+## Implementation Details
 
-(Is that correct??)
-
-#### Task: Find the optimal policy
-
-When we know the models $p(s,a,s')$ and $r(s,a,s')$:
-
-3 Steps:
-1. Inititalize some $\pi(s)$
-2. Evaluate Policy, i.e. compute $V^{\pi}(s)$
-3. Optimize policy: for all states, choose new $\tilde\pi(s) = \arg\max\limits_{a} \sum\limits_{s'} p(s'|s,a) [ r(s,a,s') + \gamma V^{\pi}(s') ]$
-
-## Experiments
+General theory - see [notes](./MarkovDecisionProcess.md).
 
 UNDER CONSTRUCTION
 
@@ -165,30 +141,6 @@ I then switched to this simpler reward. This is conceptually simpler and worked
 well for the discrete q learning (still need to make it work for deep q
 learning).
 
-### Discrete Q Learning (discretize the state space)
-
-The idea is to discretize the state space, and to then learn a table function.
-While the state space is discretized, the physics operate still on the
-non-discrete state space.
-
-When implementing an $\epsilon$-greedy policy, I first applied exploration on
-the continuous state space. This meant that in a given "cell", during one
-episode, I would do random action for every time step. A key change that made
-things work was to decide for a random action once the simulation enters a
-"cell", and to then keep that action constant until the simulation enters a new
-"cell".
-
-```
-python3 equations.py \
-  --num_episodes=10 \
-  --max_episode_steps=1000 \
-  --q_model_dim=90 \
-  --rl_gamma=0.8 \
-  --rl_alpha=1.0 \
-  --rl_explore_prob_init=1.0 \
-  --rl_explore_prob_decay=0.6 
-```
-
 
 ### Deep-Q Learning
 
@@ -198,7 +150,7 @@ directly takes the state variables as input and predicts the Q values.
 I got something working - but the current state of the code is broken. Some
 problems I ran into along the way:
 
-* I first tried to train a model $Q(state, action)$, i.e. the action is an
+* I first tried to train a model $Q(s, a)$, i.e. the action is an
   input to the network. However, this didn't work well.
-* Only then I moved to training models $Q_action(state)$ - so essentially 1 NN
+* Only then I moved to training models $Q_a(s)$ - so essentially 1 NN
   per possible action.
