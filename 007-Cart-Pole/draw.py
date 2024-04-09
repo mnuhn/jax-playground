@@ -3,7 +3,7 @@ from PIL import Image, ImageDraw
 from math import sin, cos, pi
 
 
-def draw(step, cur_state, force):
+def draw(step, cur_state, force, reward):
   x_end = cur_state.vec[state.INDEX_X] + state.const_l * sin(
       cur_state.vec[state.INDEX_THETA])
   y_end = -state.const_l * cos(cur_state.vec[state.INDEX_THETA])
@@ -18,6 +18,7 @@ def draw(step, cur_state, force):
   draw = ImageDraw.Draw(im)
 
   draw.text((0, 0), f"step={step: >5d}")
+  draw.text((80, 0), f"reward ={reward: >2.3f}")
 
   draw.text((0, 70), f"f ={force: >+5.1f}N", fill=(255, 0, 0, 255))
   draw.text((0, 80), f"x ={cur_state.vec[state.INDEX_X]: >+5.1f}m")

@@ -58,12 +58,21 @@ def evaluate(start_state, policy, params, image_fn=None, explore_prob=0.0):
     new_states.append(state_new)
     action_idxs.append(action_index)
     q_vals.append(q_val)
+    reward = cur_state.reward(action_index, state_new)
 
     if step % 25 == 0 and image_fn:
       images.append(
-          draw.draw(step, cur_state, force=state.ACTIONS[action_index]))
-    if step > p.max_episode_steps or cur_state.reward(action_index,
-                                                      state_new) < 0.001:
+          draw.draw(step,
+                    cur_state,
+                    force=state.ACTIONS[action_index],
+                    reward=reward))
+    if step > p.max_episode_steps or reward < 0.001:
+      for frames in range(100):
+        images.append(
+            draw.draw(step,
+                      cur_state,
+                      force=state.ACTIONS[action_index],
+                      reward=reward))
       break
     cur_state = state_new
     old_cell = cell
