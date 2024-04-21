@@ -27,22 +27,23 @@ assert (args.db)
 db = prompt_db.prompt_db(args.db)
 
 
-def retrieve_prompt():
+def retrieve_random_pair():
   print("retrieve prompt")
-  pid, prompt_str, reward, score = db.retrieve_prompt()
+  pid, prompt_str, cid1, completion1, cid2, completion2 = db.retrieve_random_pair(
+  )
 
-  output = f'<div style="font-size: 7vw">{prompt_str}</div>'
-  output += f"<form action='/answer/{pid}/' method='get'>"
+  output = ''
+  output += f"<form action='/answer/{pid}/{cid1}/{cid2}/input' method='get'>"
   output += '<button type="submit" style="font-size: 7vw">submit</button>'
   output += '<br/>'
+  output += f'<div style="font-size: 7vw">{prompt_str}</div>'
 
   print("retrieve completions")
   completions = [(-1, "NONE", -1, -1)]
-  completions.extend(db.retrieve_completions(pid))
 
   counter = 1
-  for cid, completion, reward, score in completions:
-    output += f'{counter}. reward={reward:.2f} score={score:.2f} '
+  for cid, completion in [(cid1, completion1), (cid2, completion2)]:
+    output += f'{counter}'
     output += f'<label for="{cid}" style="font-size: 7vw">'
     output += '<div style="border-style: dashed;">'
     output += f'<input type="checkbox" id="{cid}" name="{cid}">'
@@ -68,23 +69,38 @@ class HttpHandler(MyHTTPBaseHandler):
       self.send_response(200)
       viewer_common.send_html_header(self)
       response = bytes(
-          viewer_common.HEADER + retrieve_prompt() + viewer_common.FOOTER,
+          viewer_common.HEADER + retrieve_random_pair() + viewer_common.FOOTER,
           "utf-8")
     elif self.path.startswith("/answer"):
       rest = self.path[8:]
-      prompt_id = int(rest.split("/")[0])
-      rest = rest.split("?")[1]
-      for completion_id in rest.split("&"):
-        print("add rating")
-        completion_id = completion_id.replace("=on", "")
-        db.add_rating(prompt_id, completion_id, rating=1.0)
+
+      fields = rest.split("/")
+      params = rest.split("?")[1]
+
+      pid = int(fields[0])
+
+      ratings = {}
+      cid1 = int(fields[1])
+      ratings[cid1] = 0.0
+      cid2 = int(fields[2])
+      ratings[cid2] = 0.0
+
+      for cid in params.split("&"):
+        cid = cid.replace("=on", "")
+        if cid == "":
+          continue
+        cid = int(cid)
+        ratings[cid] = 1.0
+
+      print(f"add rating for {cid1} vs {cid2}:", ratings)
+      db.add_comparison(pid, cid1, cid2, ratings[cid1], ratings[cid2])
       db.conn.commit()
       print("commit done")
 
       self.send_response(200)
       viewer_common.send_html_header(self)
       response = bytes(
-          viewer_common.HEADER + "done<br/>" + retrieve_prompt() +
+          viewer_common.HEADER + "done<br/>" + retrieve_random_pair() +
           viewer_common.FOOTER, "utf-8")
     if response:
       self.wfile.write(response)

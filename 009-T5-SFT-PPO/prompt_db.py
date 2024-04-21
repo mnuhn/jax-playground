@@ -29,11 +29,48 @@ class prompt_db:
                                            FOREIGN KEY (pid) REFERENCES prompts(id),
                                            FOREIGN KEY (cid) REFERENCES completions(id)
                                        ); """)
+
+    self.conn.execute("""CREATE TABLE IF NOT EXISTS comparisons (
+                                           id integer PRIMARY KEY,
+                                           pid integer,
+                                           cid1 integer,
+                                           cid2 integer,
+                                           rating1 float,
+                                           rating2 float,
+                                           FOREIGN KEY (pid) REFERENCES prompts(id),
+                                           FOREIGN KEY (cid1) REFERENCES completions(id)
+                                           FOREIGN KEY (cid2) REFERENCES completions(id)
+                                       ); """)
+
     self.conn.execute(
         """CREATE INDEX IF NOT EXISTS ratings_pid ON ratings(pid);""")
     self.conn.execute(
         """CREATE INDEX IF NOT EXISTS completions_pid ON completions(pid);""")
     self.conn.commit()
+
+  def retrieve_random_pair(self):
+    cursor = self.conn.execute("""
+      SELECT prompts.id, prompt FROM prompts
+      WHERE (
+        SELECT COUNT(*)
+        FROM completions
+        WHERE prompts.id = completions.pid
+        GROUP BY completions.pid
+      ) >= 2
+      ORDER BY RANDOM() LIMIT 1;""")
+    pid, prompt_str = cursor.fetchone()
+
+    cursor = self.conn.execute(
+        """
+      SELECT id, completion FROM completions
+      WHERE completions.pid = ?
+      ORDER BY RANDOM()
+      LIMIT 2;""", (pid,))
+
+    cid1, completion1 = cursor.fetchone()
+    cid2, completion2 = cursor.fetchone()
+
+    return pid, prompt_str, cid1, completion1, cid2, completion2
 
   def retrieve_prompt(self):
     cursor = self.conn.execute("""
@@ -42,7 +79,7 @@ class prompt_db:
         SELECT 1
         FROM ratings
         WHERE prompts.id = ratings.pid
-      ) AND 
+      ) AND
         prompts.id = completions.pid
       ORDER BY prompts.id -- completions.score DESC
       LIMIT 1;""")
@@ -70,12 +107,29 @@ class prompt_db:
   def get_rated_completions(self):
     cursor = self.conn.execute("""SELECT prompts.prompt, completions.completion
        FROM prompts, completions, ratings
-       WHERE 
+       WHERE
          completions.pid = prompts.id AND
          completions.id = ratings.cid AND
          ratings.rating > 0""")
 
     return cursor.fetchall()
+
+  def add_comparison(self, pid, cid1, cid2, rating1, rating2):
+    # always have cid1 < cid2
+    if cid1 > cid2:
+      cid1, cid2 = cid2, cid1
+      rating1, rating2 = rating2, rating1
+
+    cursor = self.conn.execute(
+        "INSERT OR REPLACE INTO comparisons (pid, cid1, cid2, rating1, rating2) VALUES (?,?,?,?,?)",
+        (
+            pid,
+            cid1,
+            cid2,
+            rating1,
+            rating2,
+        ))
+    return cursor.lastrowid
 
   def add_rating(self, pid, cid, rating=1.0):
     cursor = self.conn.execute(
