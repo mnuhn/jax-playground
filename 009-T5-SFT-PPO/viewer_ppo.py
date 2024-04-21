@@ -29,7 +29,7 @@ db = prompt_db.prompt_db(args.db)
 
 def retrieve_random_pair():
   print("retrieve prompt")
-  pid, prompt_str, cid1, completion1, cid2, completion2 = db.retrieve_random_pair(
+  pid, prompt_str, cid1, completion1, score1, cid2, completion2, score2 = db.retrieve_random_pair(
   )
 
   output = ''
@@ -42,8 +42,9 @@ def retrieve_random_pair():
   completions = [(-1, "NONE", -1, -1)]
 
   counter = 1
-  for cid, completion in [(cid1, completion1), (cid2, completion2)]:
-    output += f'{counter}'
+  for cid, completion, score in [(cid1, completion1, score1),
+                                 (cid2, completion2, score2)]:
+    output += f'{counter}. score={score:.2f}'
     output += f'<label for="{cid}" style="font-size: 7vw">'
     output += '<div style="border-style: dashed;">'
     output += f'<input type="checkbox" id="{cid}" name="{cid}">'

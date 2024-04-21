@@ -19,12 +19,13 @@ from trl.models import AutoModelForSeq2SeqLMWithValueHead
 
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from transformers import DataCollatorWithPadding
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 from datasets import Dataset
 from datasets import DatasetDict
 from datasets import load_dataset
 
-import rulebased_reward_model as reward_model
+#import rulebased_reward_model as reward_model
 
 DEVICE = "cuda:0"
 
@@ -32,6 +33,10 @@ parser = argparse.ArgumentParser(description='Train PPO')
 parser.add_argument('--model',
                     dest='model',
                     default="training/1713207876-final",
+                    help='which model to open')
+parser.add_argument('--reward_model',
+                    dest='reward_model',
+                    default="training/1713732543-reward",
                     help='which model to open')
 parser.add_argument('--prompts_fn',
                     dest='prompts_fn',
@@ -67,6 +72,8 @@ ppo_config = PPOConfig(
     mini_batch_size=8,
 )
 
+reward_model = AutoModelForSequenceClassification.from_pretrained(
+    args.reward_model)
 model = AutoModelForSeq2SeqLMWithValueHead.from_pretrained(
     args.model).to(DEVICE)
 model.eval()
@@ -97,6 +104,17 @@ generation_kwargs = {
     "batch_size": 1,
 }
 
+
+def pad_sequences(sequences, max_length):
+  padding_needed = [max_length - seq.size(0) for seq in sequences]
+  padded_sequences = torch.stack([
+      torch.nn.functional.pad(seq, (0, pad), value=data.tokenizer.pad_token_id)
+      if pad > 0 else seq for seq, pad in zip(sequences, padding_needed)
+  ])
+
+  return padded_sequences
+
+
 for step, batch in tqdm(enumerate(ppo_trainer.dataloader)):
   if step >= args.max_ppo_steps:
     break
@@ -115,13 +133,20 @@ for step, batch in tqdm(enumerate(ppo_trainer.dataloader)):
   batch["response"] = data.tokenizer.batch_decode(response_tensors,
                                                   skip_special_tokens=True)
 
+  padded_response_tensors = pad_sequences(response_tensors, max_length=256)
+  padded_input_ids = pad_sequences(prompt_tensors, max_length=256)
+
   reward_tensors = []
   q_num = 0
-  for q, r in zip(batch["query"], batch["response"]):
-    reward = reward_model.ppo_reward(q, r)
-    if q_num < 10:
-      print(f'{q} -- {r} -- {reward}')
-    reward_tensors.append(torch.tensor(reward))
+  for q, r in zip(padded_input_ids, padded_response_tensors):
+    outputs_attention_mask = (r != data.tokenizer.pad_token_id).int()
+    reward_outputs = reward_model(
+        input_ids=q.unsqueeze(0).to(reward_model.device),
+        decoder_input_ids=r.unsqueeze(0).to(reward_model.device),
+        decoder_attention_mask=outputs_attention_mask.unsqueeze(0).to(
+            reward_model.device))
+    reward_probs = torch.nn.functional.softmax(reward_outputs.logits, dim=-1)
+    reward_tensors.append(torch.tensor(reward_probs[0][1]))
     q_num += 1
 
   # Run PPO step.

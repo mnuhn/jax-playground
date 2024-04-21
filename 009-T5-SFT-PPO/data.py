@@ -1,4 +1,5 @@
 from transformers import AutoTokenizer
+import torch
 
 tokenizer = AutoTokenizer.from_pretrained("t5-small")
 
@@ -46,6 +47,24 @@ def train_gen(training_data):
         yield {"source_text": f"Negate:\n{t}", "target_text": f"{s}"}
 
   return gen
+
+
+def tokenize_pairwise_function(example):
+
+  def add_tokens(text, suffix):
+    tokenized = tokenizer(text,
+                          truncation=True,
+                          max_length=128,
+                          padding='max_length',
+                          return_tensors="pt")
+    example[f'input_ids{suffix}'] = tokenized.input_ids
+    example[f'attention_mask{suffix}'] = tokenized.attention_mask
+
+  add_tokens(text=example['source_text'], suffix='')
+  add_tokens(text=example['accepted_text'], suffix='_chosen')
+  add_tokens(text=example['rejected_text'], suffix='_rejected')
+
+  return example
 
 
 def tokenize_input_function(example):

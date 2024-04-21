@@ -54,11 +54,9 @@ def predict(model, dataset):
 class CustomLoggingCallback(TrainerCallback):
 
   def __init__(self, log_every_x_steps=100):
-    # Initialize with your desired logging frequency
     self.log_every_x_steps = log_every_x_steps
 
   def on_step_end(self, args, state, control, model=None, **kwargs):
-    # This method is called at the end of each training step.
     if state.global_step % self.log_every_x_steps != 0:
       return
     if model is None:

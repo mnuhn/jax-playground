@@ -48,6 +48,32 @@ class prompt_db:
         """CREATE INDEX IF NOT EXISTS completions_pid ON completions(pid);""")
     self.conn.commit()
 
+  def get_preference_pairs_gen(self):
+    cursor = self.conn.execute("""
+    SELECT prompts.prompt, c1.completion, rating1, c2.completion, rating2 FROM
+      prompts
+      JOIN comparisons ON prompts.id = comparisons.pid
+      JOIN completions AS c1 ON comparisons.cid1 = c1.id
+      JOIN completions AS c2 ON comparisons.cid2 = c2.id
+    WHERE
+      rating1 != rating2""")
+
+    results = cursor.fetchall()
+
+    def gen():
+      for p, c1, r1, c2, r2 in results:
+        if r1 < r2:
+          r1, r2 = r2, r1
+          c1, c2 = c2, c1
+
+        yield {
+            "source_text": f'Negate:\n{p}',
+            "rejected_text": c2,
+            "accepted_text": c1
+        }
+
+    return gen
+
   def retrieve_random_pair(self):
     cursor = self.conn.execute("""
       SELECT prompts.id, prompt FROM prompts
@@ -62,15 +88,15 @@ class prompt_db:
 
     cursor = self.conn.execute(
         """
-      SELECT id, completion FROM completions
+      SELECT id, completion, score FROM completions
       WHERE completions.pid = ?
-      ORDER BY RANDOM()
+      ORDER BY score + RANDOM()
       LIMIT 2;""", (pid,))
 
-    cid1, completion1 = cursor.fetchone()
-    cid2, completion2 = cursor.fetchone()
+    cid1, completion1, score1 = cursor.fetchone()
+    cid2, completion2, score2 = cursor.fetchone()
 
-    return pid, prompt_str, cid1, completion1, cid2, completion2
+    return pid, prompt_str, cid1, completion1, score1, cid2, completion2, score2
 
   def retrieve_prompt(self):
     cursor = self.conn.execute("""
@@ -97,7 +123,8 @@ class prompt_db:
     return cursor.fetchall()
 
   def get_completions(self):
-    cursor = self.conn.execute("""SELECT prompts.prompt, completions.completion
+    cursor = self.conn.execute(
+        """SELECT prompts.prompt, completions.completion, completions.score, completions.reward
        FROM prompts, completions
        WHERE completions.pid = prompts.id
        ORDER BY prompts.id""")
