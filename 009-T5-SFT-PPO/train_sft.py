@@ -31,13 +31,13 @@ args = parser.parse_args()
 
 model = AutoModelForSeq2SeqLM.from_pretrained(
     "t5-small")  # "training/1712925943-final")#
-data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
+data_collator = DataCollatorWithPadding(tokenizer=data.tokenizer)
 
 all_data = Dataset.from_generator(data.train_gen(
     args.training_data)).shuffle(seed=42)
 dataset = all_data.train_test_split(test_size=0.05, shuffle=True, seed=42)
 
-tokenized_datasets = dataset.map(tokenize_function, batched=True)
+tokenized_datasets = dataset.map(data.tokenize_function, batched=True)
 tokenized_datasets = tokenized_datasets.remove_columns(
     ["source_text", "target_text"])
 
@@ -67,17 +67,18 @@ class CustomLoggingCallback(TrainerCallback):
       count += 1
       if count >= 5:
         break
-      input_ids = tokenizer.encode(e["source_text"],
-                                   padding=True,
-                                   truncation=True,
-                                   max_length=128,
-                                   return_tensors="pt")
+      input_ids = data.tokenizer.encode(e["source_text"],
+                                        padding=True,
+                                        truncation=True,
+                                        max_length=128,
+                                        return_tensors="pt")
       input_ids = input_ids.to(model.device)
       outputs = model.generate(
           input_ids, max_length=128,
           num_beams=5)  #, early_stopping=True, temperature=0.7)
-      print(e["source_text"].replace("Negate:\n", ""),
-            tokenizer.decode(outputs[0], skip_special_tokens=True))
+      debug_in = e["source_text"].replace("Negate:\n", "")
+      debug_out = data.tokenizer.decode(outputs[0], skip_special_tokens=True)
+      print(f'Example: "{debug_in}" -> "{debug_out}"')
 
 
 out_fn = f'./training/{str(int(time.time()))}'
