@@ -28,27 +28,70 @@ db = prompt_db.prompt_db(args.db)
 
 
 def retrieve_random_pair():
+  FONTSIZE = "3vw"
   print("retrieve prompt")
   pid, prompt_str, cid1, completion1, score1, cid2, completion2, score2 = db.retrieve_random_pair(
   )
+  prompt_words = set(prompt_str.split())
+  prompt_words_lower = set(prompt_str.lower().split())
+
+  completion_words = set(completion1.lower().split() +
+                         completion2.lower().split())
+
+  prompt_str_html = ""
+  space = ""
+  for w in prompt_str.split():
+    if w.lower() in completion_words:
+      color = 'none'
+    else:
+      color = '#FFCCCB'
+
+    prompt_str_html += f"{space}<span style='background-color: {color}'>{w}</span>"
+    space = " "
 
   output = ''
   output += f"<form action='/answer/{pid}/{cid1}/{cid2}/input' method='get'>"
-  output += '<button type="submit" style="font-size: 7vw">submit</button>'
+  output += f'<button type="submit" style="font-size: {FONTSIZE}">submit</button>'
   output += '<br/>'
-  output += f'<div style="font-size: 7vw">{prompt_str}</div>'
+  output += '<br/>'
+  output += f'<div style="border-style: dashed; font-size: {FONTSIZE}; background-color: #F0F0F0">{prompt_str_html}</div>'
+  output += '<br/>'
 
   print("retrieve completions")
   completions = [(-1, "NONE", -1, -1)]
 
   counter = 1
-  for cid, completion, score in [(cid1, completion1, score1),
-                                 (cid2, completion2, score2)]:
+  for cid, completion, score, other in [
+      (cid1, completion1, score1, completion2),
+      (cid2, completion2, score2, completion1)
+  ]:
+    other = set(other.lower().split())
+    completion_html = ""
+    space = ""
+    for w in completion.split():
+      in_prompt = w in prompt_words
+      in_prompt_lower = w in prompt_words_lower and not w in prompt_words
+      in_other = w in other
+
+      color = 'white'
+      if in_prompt_lower:
+        color = '#F0F0F0'
+      if not in_prompt and not in_prompt_lower:
+        if in_other:
+          color = '#ECFFDC'
+        else:
+          color = 'lightyellow'
+
+      completion_html += f"{space}<span style='background-color: {color}'>{w}</span>"
+      space = " "
+
+    completion_html = completion_html.strip()
     output += f'{counter}. score={score:.2f}'
-    output += f'<label for="{cid}" style="font-size: 7vw">'
+    output += f'<label for="{cid}" style="font-size: {FONTSIZE}">'
     output += '<div style="border-style: dashed;">'
+    output += f'{completion_html}'
     output += f'<input type="checkbox" id="{cid}" name="{cid}">'
-    output += f'{completion}</div></label>'
+    output += f'</div></label>'
     output += "<br/>"
     counter += 1
 

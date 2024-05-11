@@ -15,8 +15,10 @@ class prompt_db:
     self.conn.execute("""CREATE TABLE IF NOT EXISTS completions (
                                            id integer PRIMARY KEY,
                                            pid integer,
+                                           name text,
                                            completion text,
                                            reward float,
+                                           rule_reward float,
                                            score float,
                                            UNIQUE(pid, completion)
                                        ); """)
@@ -46,6 +48,10 @@ class prompt_db:
         """CREATE INDEX IF NOT EXISTS ratings_pid ON ratings(pid);""")
     self.conn.execute(
         """CREATE INDEX IF NOT EXISTS completions_pid ON completions(pid);""")
+    self.conn.execute(
+        """CREATE INDEX IF NOT EXISTS idx_completions_completion ON completions(completion);"""
+    )
+
     self.conn.commit()
 
   def get_preference_pairs_gen(self):
@@ -62,39 +68,63 @@ class prompt_db:
 
     def gen():
       for p, c1, r1, c2, r2 in results:
-        if r1 < r2:
+        if r2 > r1:
           r1, r2 = r2, r1
           c1, c2 = c2, c1
 
         yield {
-            "source_text": f'Negate:\n{p}',
-            "rejected_text": c2,
-            "accepted_text": c1
+            "prompt_text": f'Negate:\n{p}',
+            "accepted_text": f'{c1}',
+            "rejected_text": f'{c2}'
         }
 
     return gen
 
   def retrieve_random_pair(self):
+    print("query")
     cursor = self.conn.execute("""
-      SELECT prompts.id, prompt FROM prompts
-      WHERE (
-        SELECT COUNT(*)
-        FROM completions
-        WHERE prompts.id = completions.pid
-        GROUP BY completions.pid
-      ) >= 2
-      ORDER BY RANDOM() LIMIT 1;""")
-    pid, prompt_str = cursor.fetchone()
-
-    cursor = self.conn.execute(
-        """
-      SELECT id, completion, score FROM completions
-      WHERE completions.pid = ?
-      ORDER BY score + RANDOM()
-      LIMIT 2;""", (pid,))
-
-    cid1, completion1, score1 = cursor.fetchone()
-    cid2, completion2, score2 = cursor.fetchone()
+		SELECT 
+			p.id AS prompt_id,
+			p.prompt,
+			c1.id AS completion1_id,
+			c1.name AS name1,
+			c1.completion AS completion1_text,
+			c1.score AS score1,
+			c2.id AS completion2_id,
+			c2.name AS name2,
+			c2.completion AS completion2_text,
+			c2.score AS score2,
+			ABS(c1.score - c2.score) AS score_difference
+		FROM 
+			prompts p
+		JOIN 
+			completions c1 ON p.id = c1.pid
+		JOIN 
+			completions c2 ON p.id = c2.pid
+		LEFT JOIN 
+			comparisons comp ON (
+				comp.pid = p.id)
+		WHERE 
+			c1.id <> c2.id
+			AND c1.name <> c2.name
+			AND c1.name = 'default'
+            AND c2.name != 'not'
+            AND c2.name != 'no_not'
+			AND c1.completion <> c2.completion
+			AND NOT EXISTS (
+				SELECT 1
+				FROM completions c3
+				WHERE c3.completion = c2.completion AND c3.name = c1.name
+			)
+			AND comp.id IS NULL
+		ORDER BY 
+            c2.score DESC,
+            c1.score DESC
+		LIMIT 1""")
+    pid, prompt_str, cid1, name1, completion1, score1, cid2, name2, completion2, score2, _ = cursor.fetchone(
+    )
+    print("done")
+    print(name1, name2)
 
     return pid, prompt_str, cid1, completion1, score1, cid2, completion2, score2
 
@@ -107,7 +137,7 @@ class prompt_db:
         WHERE prompts.id = ratings.pid
       ) AND
         prompts.id = completions.pid
-      ORDER BY prompts.id -- completions.score DESC
+      ORDER BY prompts.id DESC
       LIMIT 1;""")
 
     result = cursor.fetchone()
@@ -117,7 +147,10 @@ class prompt_db:
   def retrieve_completions(self, pid):
     cursor = self.conn.execute(
         """
-      SELECT id, completion, reward, score FROM completions WHERE pid = ? ORDER BY completions.score DESC, reward  DESC, RANDOM();
+      SELECT id, completion, rule_reward, score
+      FROM completions
+      WHERE pid = ?
+      ORDER BY score DESC, rule_reward DESC, RANDOM();
       """, (pid,))
 
     return cursor.fetchall()
@@ -178,14 +211,16 @@ class prompt_db:
       item_id = cursor.fetchone()[0]
       return item_id  # Return the existing ID
 
-  def add_completion(self, pid, completion, reward, score):
+  def add_completion(self, pid, name, completion, reward, rule_reward, score):
     try:
       cursor = self.conn.execute(
-          "INSERT INTO completions (pid, completion, reward, score) VALUES (?,?,?,?)",
+          "INSERT INTO completions (pid, name, completion, reward, rule_reward, score) VALUES (?,?,?,?,?,?)",
           (
               pid,
+              name,
               completion,
               reward,
+              rule_reward,
               score,
           ))
       return cursor.lastrowid

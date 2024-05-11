@@ -2,6 +2,17 @@ import string
 import re
 import collections
 
+antonyms = {}
+
+for l in open("rulebased_reward_model.pairs.txt"):
+  s, t = l.strip().lower().split()
+  if s not in antonyms:
+    antonyms[s] = set()
+  if t not in antonyms:
+    antonyms[t] = set()
+  antonyms[s].add(t)
+  antonyms[t].add(s)
+
 
 def jaccard_reward(input_str, output_str, skip_words=set(), case=True):
   input_str = re.sub(r"[,.;@#?!&$]+", ' ', input_str)
@@ -13,9 +24,16 @@ def jaccard_reward(input_str, output_str, skip_words=set(), case=True):
 
   input_set = set(input_str.split()) - skip_words
   output_set = set(output_str.split()) - skip_words
+
+  input_set_extended = set(input_set)
+  for y in input_set:
+    if y in antonyms:
+      for x in antonyms[y]:
+        input_set_extended.add(x)
+
   if len(input_set) == 0 and len(output_set) == 0:
-    return 0.0
-  jaccard = len(input_set.intersection(output_set)) / (len(
+    return 0.1
+  jaccard = len(input_set_extended.intersection(output_set)) / (len(
       input_set.union(output_set)))
   return jaccard
 
@@ -49,10 +67,10 @@ def punctuation_reward(input_str, output_str):
   if input_str == output_str:
     return 1.0
   if len(input_str) == 0 or len(output_str) == 0:
-    return 0.0
+    return 0.1
   if input_str[-1] == output_str[-1]:
     return 0.5
-  return 0.0
+  return 0.1
 
 
 def preprocess(in_str):
@@ -75,14 +93,14 @@ def repeated_words_reward(input_str, output_str):
   output_repetitions = most_common_cnt(output_str) > 1
   if input_repetitions == output_repetitions:
     return 1.0
-  return 0.0
+  return 0.1
 
 
 def equality_reward(input_str, output_str):
   input_str = preprocess(input_str)
   output_str = preprocess(output_str)
   if input_str == output_str:
-    return 0.0
+    return 0.1
   return 1.0
 
 
@@ -93,12 +111,16 @@ def length_reward(input_str, output_str):
   l_out = len(output_str)
 
   diff = abs(l_in - l_out) / (l_in + l_out)
-  return 1.0 - diff
+  result = 1.0 - diff
+  # allow some wiggle room
+  if result > 0.8:
+    return 1.0
+  return 0.1
 
 
 def ppo_reward(input_str, output_str):
-  input_str = input_str.replace("Negate:", "")
-  output_str = output_str.replace("Negate:", "")
+  input_str = input_str.replace("Negate:", "").strip()
+  output_str = output_str.replace("Negate:", "").strip()
 
   result = 0.0
 
@@ -111,7 +133,6 @@ def ppo_reward(input_str, output_str):
   factor_b += repeated_words_reward(input_str, output_str)
 
   result = factor_a * factor_b
-
   return result
 
 

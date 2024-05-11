@@ -31,7 +31,11 @@ def retrieve_prompt():
   print("retrieve prompt")
   pid, prompt_str, reward, score = db.retrieve_prompt()
 
-  output = f'<div style="font-size: 7vw">{prompt_str}</div>'
+  prompt_words = set(prompt_str.split())
+  prompt_words_lower = set(prompt_str.lower().split())
+
+  output = f'<div style="font-size: 7vw; position: fixed; top:0; background-color: lightgray; border-style: solid">{prompt_str}</div>'
+  output += f'<div style="font-size: 7vw;">{prompt_str}</div>'
   output += f"<form action='/answer/{pid}/' method='get'>"
   output += '<button type="submit" style="font-size: 7vw">submit</button>'
   output += '<br/>'
@@ -42,11 +46,24 @@ def retrieve_prompt():
 
   counter = 1
   for cid, completion, reward, score in completions:
+    completion_html = ""
+    space = ""
+    for w in completion.split():
+      if w in prompt_words:
+        completion_html += f"{space}{w}"
+      elif w.lower() in prompt_words_lower:
+        completion_html += f"{space}<span style='background-color: #F0F0F0'>{w}</span>"
+      else:
+        completion_html += f"{space}<span style='background-color: lightyellow'>{w}</span>"
+      space = " "
+
+    completion_html = completion_html.strip()
+
     output += f'{counter}. reward={reward:.2f} score={score:.2f} '
     output += f'<label for="{cid}" style="font-size: 7vw">'
     output += '<div style="border-style: dashed;">'
     output += f'<input type="checkbox" id="{cid}" name="{cid}">'
-    output += f'{completion}</div></label>'
+    output += f'{completion_html}</div></label>'
     output += "<br/>"
     counter += 1
 
@@ -91,6 +108,6 @@ class HttpHandler(MyHTTPBaseHandler):
 
 
 if __name__ == '__main__':
-  server = ThreadingSimpleServer((args.host, args.port), HttpHandler)
+  server = ThreadingSimpleServer((args.host, int(args.port)), HttpHandler)
   print('Starting server, use <Ctrl-C> to stop')
   server.serve_forever()

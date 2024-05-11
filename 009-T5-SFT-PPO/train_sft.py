@@ -26,6 +26,10 @@ parser.add_argument('--training_data',
                     dest='training_data',
                     default=None,
                     help='training_data')
+parser.add_argument('--model_out',
+                    dest='model_out',
+                    default=f'./training/{str(int(time.time()))}',
+                    help='model_out')
 
 args = parser.parse_args()
 
@@ -81,8 +85,6 @@ class CustomLoggingCallback(TrainerCallback):
       print(f'Example: "{debug_in}" -> "{debug_out}"')
 
 
-out_fn = f'./training/{str(int(time.time()))}'
-
 optimizer = Adafactor(
     model.parameters(),
     scale_parameter=True,
@@ -93,7 +95,7 @@ optimizer = Adafactor(
 )
 
 training_args = TrainingArguments(
-    output_dir=out_fn,
+    output_dir=args.model_out,
     num_train_epochs=10.0,
     warmup_steps=10,
     learning_rate=None,  #1e-3,
@@ -121,4 +123,4 @@ trainer = Trainer(
 )
 
 trainer.train()
-trainer.save_model(out_fn + "-final")
+trainer.save_model(args.model_out + "-final")

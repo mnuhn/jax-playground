@@ -7,9 +7,10 @@ tokenizer = AutoTokenizer.from_pretrained("t5-small")
 def prompt_gen(prompts_fn):
 
   def gen():
-    pairs = set()
     for l in open(prompts_fn):
       l = l.strip()
+      if len(l) > 80:  # chars
+        continue
       yield {"source_text": f"Negate:\n{l}"}
 
   return gen
@@ -39,13 +40,6 @@ def train_gen(training_data):
         yield {"source_text": f"Negate:\n{s}", "target_text": f"{t}"}
         yield {"source_text": f"Negate:\n{t}", "target_text": f"{s}"}
 
-      s = s.capitalize()
-      t = t.capitalize()
-      if (s, t) not in pairs and (t, s) not in pairs:
-        pairs.add((s, t))
-        yield {"source_text": f"Negate:\n{s}", "target_text": f"{t}"}
-        yield {"source_text": f"Negate:\n{t}", "target_text": f"{s}"}
-
   return gen
 
 
@@ -57,12 +51,21 @@ def tokenize_pairwise_function(example):
                           max_length=128,
                           padding='max_length',
                           return_tensors="pt")
+
     example[f'input_ids{suffix}'] = tokenized.input_ids
     example[f'attention_mask{suffix}'] = tokenized.attention_mask
 
-  add_tokens(text=example['source_text'], suffix='')
+  add_tokens(text=example['prompt_text'], suffix='_prompt')
   add_tokens(text=example['accepted_text'], suffix='_chosen')
   add_tokens(text=example['rejected_text'], suffix='_rejected')
+
+  print("prompt_text", example['prompt_text'][0])
+  print("mask", example['attention_mask_prompt'][0])
+  print("ids", example['input_ids_prompt'][0])
+
+  print("prompt_text", example['accepted_text'][0])
+  print("mask", example['attention_mask_chosen'][0])
+  print("ids", example['input_ids_chosen'][0])
 
   return example
 
