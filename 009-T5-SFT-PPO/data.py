@@ -1,5 +1,6 @@
 from transformers import AutoTokenizer
 import torch
+import hashlib
 
 tokenizer = AutoTokenizer.from_pretrained("t5-small")
 
@@ -7,10 +8,13 @@ tokenizer = AutoTokenizer.from_pretrained("t5-small")
 def prompt_gen(prompts_fn):
 
   def gen():
+    count = 0
     for l in open(prompts_fn):
+      count += 1
       l = l.strip()
       if len(l) > 80:  # chars
         continue
+      print(count)
       yield {"source_text": f"Negate:\n{l}"}
 
   return gen
@@ -28,20 +32,32 @@ def train_gen(training_data):
       s = fields[0].replace("_", " ")
       t = fields[1].replace("_", " ")
 
-      if (s, t) not in pairs and (t, s) not in pairs:
+      def add_pair(s, t):
+        if (s, t) in pairs or (t, s) in pairs:
+          return
+
         pairs.add((s, t))
         yield {"source_text": f"Negate:\n{s}", "target_text": f"{t}"}
         yield {"source_text": f"Negate:\n{t}", "target_text": f"{s}"}
 
-      s = s.lower()
-      t = t.lower()
-      if (s, t) not in pairs and (t, s) not in pairs:
-        pairs.add((s, t))
-        yield {"source_text": f"Negate:\n{s}", "target_text": f"{t}"}
-        yield {"source_text": f"Negate:\n{t}", "target_text": f"{s}"}
+        if s.isalpha() and t.isalpha():
+          suffix_id = int(hashlib.sha256((s+t).encode("utf-8")).hexdigest(), 16) % 3
+          p = [".", "!", "..."][suffix_id]
+          if (s+p, t+p) not in pairs:
+            pairs.add((s+p,t+p))
+            yield {"source_text": f"Negate:\n{s}{p}", "target_text": f"{t}{p}"}
+            yield {"source_text": f"Negate:\n{t}{p}", "target_text": f"{s}{p}"}
+
+      yield from add_pair(s,t)
+      casing = int(hashlib.sha256((s+t).encode("utf-8")).hexdigest(), 16) % 3
+      if casing == 0:
+        yield from add_pair(s.lower(),t.lower())
+      elif casing == 1:
+        yield from add_pair(s.upper(),t.upper())
+      elif casing == 2:
+        yield from add_pair(s.title(),t.title())
 
   return gen
-
 
 def tokenize_pairwise_function(example):
 

@@ -95,6 +95,7 @@ optimizer = Adafactor(
 )
 
 training_args = TrainingArguments(
+    log_with='tensorboard',
     output_dir=args.model_out,
     num_train_epochs=10.0,
     warmup_steps=10,

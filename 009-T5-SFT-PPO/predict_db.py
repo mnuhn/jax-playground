@@ -12,6 +12,7 @@ from tqdm import tqdm
 import skip_file
 import random
 import rulebased_reward_model
+import random
 
 import argparse
 import force_words
@@ -20,6 +21,14 @@ parser = argparse.ArgumentParser(description='add predictions to database')
 parser.add_argument('--model',
                     dest='model',
                     default="training/1713207876-final",
+                    help='which model to open')
+parser.add_argument('--low_rule_reward_override',
+                    dest='low_rule_reward_override',
+                    default=False,
+                    help='low_rule_reward_override')
+parser.add_argument('--model2',
+                    dest='model2',
+                    default=None,
                     help='which model to open')
 parser.add_argument('--reward_model',
                     dest='reward_model',
@@ -70,6 +79,10 @@ args = parser.parse_args()
 
 tokenizer = AutoTokenizer.from_pretrained("t5-small")
 model = AutoModelForSeq2SeqLM.from_pretrained(args.model)
+if args.model2:
+  model2 = AutoModelForSeq2SeqLM.from_pretrained(args.model2)
+else:
+  model2 = None
 reward_model = AutoModelForSequenceClassification.from_pretrained(
     args.reward_model)
 
@@ -93,9 +106,9 @@ if not args.interactive:
 #random.shuffle(prompts)
 
 
-def predict(input_str, input_ids, force_words_ids, bad_words_ids, name):
+def predict(m, input_str, input_ids, force_words_ids, bad_words_ids, name):
   try:
-    outputs = model.generate(
+    outputs = m.generate(
         input_ids,
         return_dict_in_generate=True,
         output_scores=True,
@@ -149,7 +162,14 @@ if args.interactive:
   pbar = tqdm(sys.stdin)
 else:
   pbar = tqdm(prompts)
+
+added_comparisons = 0
+sum1 = 0
+sum2 = 0
+cnt = 0
 for input_str in pbar:
+  cnt += 1
+  prompt_id = None
   pbar.set_description(f"Processing: '{input_str}'")
   if db:
     prompt_id = db.add_prompt(input_str)
@@ -161,6 +181,9 @@ for input_str in pbar:
                                return_tensors="pt")
   input_ids = input_ids.to(model.device)
 
+  #force_words = None
+  #force_words = tokenizer([sys.stdin.readline()], add_special_tokens=False).input_ids
+
   force_words_ids = [("default", None, None)]
 
   if args.force_antonyms:
@@ -171,9 +194,10 @@ for input_str in pbar:
     force_words_ids.append(("not", [force_words.get_not(tokenizer)], None))
 
   results = []
+  results2 = []
   for name, cur_force_words_ids, cur_bad_words_ids in force_words_ids:
     print(cur_force_words_ids)
-    cur_results = predict(input_str,
+    cur_results = predict(model, input_str,
                           input_ids,
                           cur_force_words_ids,
                           cur_bad_words_ids,
@@ -181,27 +205,79 @@ for input_str in pbar:
     if cur_results:
       results.extend(cur_results)
 
+    if model2:
+      cur_results = predict(model2, input_str,
+                            input_ids,
+                            cur_force_words_ids,
+                            cur_bad_words_ids,
+                            name=name)
+      if cur_results:
+        results2.extend(cur_results)
+
   results = sorted(results, key=lambda x: x[3], reverse=True)
+  results2 = sorted(results2, key=lambda x: x[3], reverse=True)
   print()
   print(prompt_str.replace("Negate:\n", ""))
   i = 0
   previous_str = None
-  counts = defaultdict(int)
   print("num overall_score reward rule_reward | name | output_str")
-  for output_str, reward, rule_reward, overall_score, name in results:
-    if counts[name] >= args.num_to_keep_per_type:
-      continue
+  pos = 0
 
-    if previous_str != output_str:
-      counts[name] += 1
-      print(
-          f'{i:03d} {overall_score:10.4f} {reward:10.4f} {rule_reward:10.4f} | {name} | {output_str}'
-      )
-      previous_str = output_str
+  def print_result(i, output_str, reward, rule_reward, overall_score, name, prefix=""):
+    total_reward = rule_reward * 0.05 + 0.95 * reward
+    if args.low_rule_reward_override and rule_reward < 1.0:
+      total_reward *= 0.8
+    if args.low_rule_reward_override and rule_reward < 0.1:
+      total_reward *= 0.1
+      total_reward -= 0.2
+    if counts[name] >= args.num_to_keep_per_type:
+      return None, total_reward
+
+    counts[name] += 1
+    print(
+            f'{prefix}{i:03d} {overall_score:10.4f} {overall_score:10.4f} {total_reward:10.4f} {reward:10.4f} {rule_reward:10.4f} | {name} | {output_str}'
+    )
 
     if db:
-      db.add_completion(prompt_id, name, output_str, reward, rule_reward,
-                        overall_score)
+      return db.add_completion(prompt_id, name, output_str, reward, rule_reward,
+                        overall_score), total_reward
+    return None, total_reward
+
+  print(f"Model 1: Avg reward {sum1/cnt}")
+  i = 0
+  counts = defaultdict(int)
+  results_ids = []
+  for output_str, reward, rule_reward, overall_score, name in results:
+    cur_id, total_reward = print_result(i, output_str, reward, rule_reward, overall_score, name, prefix="M1 ")
+    sum1 += total_reward
+    results_ids.append(cur_id)
     i += 1
+
+  results = [r + (r2,) for r, r2 in zip(results, results_ids)]
+  results = [x for x in results if x[-1] is not None]
+  print(results)
+
+  print(f"Model 2: Avg reward {sum2/cnt}")
+  i = 0
+  counts = defaultdict(int)
+  results2_ids = []
+  for output_str, reward, rule_reward, overall_score, name in results2:
+    cur_id, total_reward = print_result(i, output_str, reward, rule_reward, overall_score, name, prefix="M2 ")
+    sum2 += total_reward
+    results2_ids.append(cur_id)
+    i += 1
+
+  results2 = [r + (r2,) for r, r2 in zip(results2, results2_ids)]
+  results2 = [x for x in results2 if x[-1] is not None]
+  if not args.interactive and db:
+    best = random.choice(sorted(results, key=lambda x: x[2])[-5:])
+    worst = sorted(results, key=lambda x: x[2])[0]
+    if worst[2] <= 0.01 and best[2] > 1.0:
+      print(best, worst)
+      if db:
+        added_comparisons += 1
+        db.add_comparison(prompt_id, best[-1], worst[-1], 1.1, 0.0)
+
   if db:
     db.conn.commit()
+  print("added comparisons", added_comparisons)

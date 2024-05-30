@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import augment
 
 
 class prompt_db:
@@ -72,11 +73,45 @@ class prompt_db:
           r1, r2 = r2, r1
           c1, c2 = c2, c1
 
+        if c1 == c2:
+          continue
+
         yield {
             "prompt_text": f'Negate:\n{p}',
             "accepted_text": f'{c1}',
             "rejected_text": f'{c2}'
         }
+
+        if c1 != p:
+          yield {
+              "prompt_text": f'Negate:\n{p}',
+              "accepted_text": f'{c1}',
+              "rejected_text": f'{p}'
+          }
+
+          if p.lower() != p:
+            yield {
+                "prompt_text": f'Negate:\n{p}',
+                "accepted_text": f'{c1}',
+                "rejected_text": f'{p.lower()}'
+            }
+
+          p_merged = augment.randomly_merge_successive_words(p)
+          if p_merged != p and p_merged != c1:
+            yield {
+                "prompt_text": f'Negate:\n{p}',
+                "accepted_text": f'{c1}',
+                "rejected_text": f'{p_merged}'
+            }
+
+          c1_merged = augment.randomly_merge_successive_words(c1)
+          if c1_merged != c1 and c1_merged != c1:
+            yield {
+                "prompt_text": f'Negate:\n{p}',
+                "accepted_text": f'{c1}',
+                "rejected_text": f'{c1_merged}'
+            }
+
 
     return gen
 
@@ -106,20 +141,17 @@ class prompt_db:
 				comp.pid = p.id)
 		WHERE 
 			c1.id <> c2.id
-			AND c1.name <> c2.name
 			AND c1.name = 'default'
-            AND c2.name != 'not'
-            AND c2.name != 'no_not'
+			AND c2.name = 'default'
 			AND c1.completion <> c2.completion
-			AND NOT EXISTS (
-				SELECT 1
-				FROM completions c3
-				WHERE c3.completion = c2.completion AND c3.name = c1.name
-			)
+			AND p.prompt <> c1.completion
+            AND LENGTH(c2.completion) > 2 * LENGTH(c1.completion)
+            AND LENGTH(c2.completion) > 2 * LENGTH(p.prompt)
 			AND comp.id IS NULL
-		ORDER BY 
-            c2.score DESC,
-            c1.score DESC
+		ORDER BY
+            LENGTH(p.prompt) ASC,
+            c1.score DESC,
+            abs(c1.score-c2.score) DESC
 		LIMIT 1""")
     pid, prompt_str, cid1, name1, completion1, score1, cid2, name2, completion2, score2, _ = cursor.fetchone(
     )

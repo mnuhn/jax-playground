@@ -101,6 +101,11 @@ dataset = all_data.train_test_split(test_size=args.test_frac,
                                     shuffle=True,
                                     seed=45)
 
+for x in dataset["test"]:
+  print(x["prompt_text"])
+  print(x["accepted_text"])
+  print(x["rejected_text"])
+
 if not args.model:
   sys.exit(1)
 if not args.out_model:
@@ -185,6 +190,8 @@ class CustomLoggingCallback(TrainerCallback):
     count = 0
     for e in dataset["test"]:
       count += 1
+      if count > 10:
+        break
 
       def reward(text):
         tok = data.tokenizer(text,
@@ -217,8 +224,8 @@ training_args = RewardConfig(
     metric_for_best_model='eval_loss',
     save_strategy='steps',
     evaluation_strategy='steps',
-    save_steps=10,
-    eval_steps=5,
+    save_steps=20,
+    eval_steps=20,
     remove_unused_columns=False,
     max_length=128,
 )
@@ -230,7 +237,7 @@ trainer = CustomRewardTrainer(
     data_collator=default_data_collator,
     train_dataset=dataset['train'],
     eval_dataset=dataset['test'],
-    callbacks=[CustomLoggingCallback(log_every_x_steps=50)],
+    callbacks=[CustomLoggingCallback(log_every_x_steps=100)],
 )
 
 trainer.train()

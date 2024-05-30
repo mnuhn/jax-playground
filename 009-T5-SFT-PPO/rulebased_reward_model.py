@@ -100,7 +100,7 @@ def equality_reward(input_str, output_str):
   input_str = preprocess(input_str)
   output_str = preprocess(output_str)
   if input_str == output_str:
-    return 0.1
+    return 0.01
   return 1.0
 
 
