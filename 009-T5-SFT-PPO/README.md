@@ -1,17 +1,36 @@
-OpposiText - Transformer Model to generate sentences with the "opposite" meaning.
+# OpposiText - Transformer Model to generate text with the "opposite" meaning.
 
-OpposiText is a simple transformer model based on the T5 architecture. CITATION.
+The model generates sentences with an inverted / negated / opposite meaning of
+it's input sentence. Overall, the project focuses on sentences of up to 12
+words.
 
-In this project I apply common techniques to train transformer models:
-* Supervised fine-tuning
-* Reward modeling
-* RLHF using PPO
-* Training data augmentation
+OpposiText is a simple transformer model based on the T5 architecture. The
+model is bootstrapped from the T5-small baseline using the following
+techniques:
+
+1. Supervised fine-tuning
+2. Reward modeling
+3. RLHF using PPO
+4. Training data augmentation
 
 I evaluate the models using ELO ratings to show how the techniques improve the
 performance of the model.
 
 # Definition of the Task
+
+For an input sentence, return a sentence with the opposite meaning. For a
+simple sentence like "X is Y" it should be "X is not Y" or "X is Z" where Z is
+an antonym.
+
+For more complex sentences like "X is Y and Z" it should be "X is not Y and not
+Z".
+
+For questions, asking a different question is good enough.
+
+X if Y -> Not X if Not Y.
+
+Do X to achieve Y.
+Do not do X to achieve not Y.
 
 
 # Base model: T5-simple
