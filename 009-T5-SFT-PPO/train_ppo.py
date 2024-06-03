@@ -2,6 +2,7 @@
 
 import os
 from datasets import set_caching_enabled
+
 set_caching_enabled(False)
 
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
@@ -39,7 +40,7 @@ parser.add_argument('--model',
                     help='which model to open')
 parser.add_argument('--rule_reward_fac',
                     dest='rule_reward_fac',
-                    default=0.1,
+                    default=0.01,
                     type=float,
                     help='which model to open')
 parser.add_argument('--reward_model',
@@ -134,7 +135,8 @@ ppo_config = PPOConfig(
     adap_kl_ctrl=True,
     kl_penalty='abs',
     project_kwargs={
-        "logging_dir": f'{args.model}.{args.suffix}.ppo.tensorboard/bs{args.batch_size}-rewardfac-{args.rule_reward_fac}-rulereward{args.use_score_scaling}{args.use_score_norm}-initklcoeff-{args.init_kl_coef}-klhorizon{args.kl_horizon}-lr{args.learning_rate}'
+        "logging_dir":
+            f'{args.model}.{args.suffix}.ppo.tensorboard/bs{args.batch_size}-rewardfac-{args.rule_reward_fac}-rulereward{args.use_score_scaling}{args.use_score_norm}-initklcoeff-{args.init_kl_coef}-klhorizon{args.kl_horizon}-lr{args.learning_rate}'
     },
 )
 
@@ -188,6 +190,7 @@ def pad_sequences(sequences, max_length):
 
   return padded_sequences
 
+
 assert reward_model != None
 
 initial_stats = None
@@ -212,7 +215,7 @@ for step, batch in tqdm(enumerate(ppo_trainer.dataloader)):
     example_num = 0
     for q_str, r_str in zip(prompt_strs, response_strs):
       print()
-      print(q_str.replace("Negate:",""))
+      print(q_str.replace("Negate:", ""))
       print(r_str)
       example_num += 1
       if example_num > 19:
@@ -251,13 +254,9 @@ for step, batch in tqdm(enumerate(ppo_trainer.dataloader)):
             reward_model.device))
     reward_probs = torch.nn.functional.softmax(reward_outputs.logits, dim=-1)
     cur_reward = reward_probs[0][1].item()
-    total_reward = (1.0 - args.rule_reward_fac
-                   ) * cur_reward + args.rule_reward_fac * cur_rule_reward
-    if args.low_rule_reward_override and cur_rule_reward < 1.0:
-      total_reward *= 0.8
-    if args.low_rule_reward_override and cur_rule_reward < 0.1:
-      total_reward *= 0.1
-      total_reward -= 0.2
+    total_reward = rulebased_reward_model.combine(cur_rule_reward, cur_reward,
+                                                  args.rule_reward_fac,
+                                                  args.low_rule_reward_override)
     reward_tensors.append(torch.tensor(total_reward))
     if q_num < 5:
       print("===")
@@ -283,11 +282,11 @@ for step, batch in tqdm(enumerate(ppo_trainer.dataloader)):
     reward_mean_max = reward_mean
 
   # save if a better checkpoint observed
-  if reward_mean > reward_mean_max: 
+  if reward_mean > reward_mean_max:
     out_fn = f'{args.model}.{args.suffix}.ppo-step{step}'
     ppo_trainer.save_pretrained(out_fn)
     reward_mean_max = reward_mean
-    
+
   stats = ppo_trainer.step(prompt_tensors, response_tensors, reward_tensors)
   ppo_trainer.log_stats(stats, batch, reward_tensors)
   if not initial_stats:

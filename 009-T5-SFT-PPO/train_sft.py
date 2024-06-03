@@ -34,7 +34,7 @@ parser.add_argument('--model_out',
 args = parser.parse_args()
 
 model = AutoModelForSeq2SeqLM.from_pretrained(
-    "t5-small")  # "training/1712925943-final")#
+    "t5-base")  # "training/1712925943-final")#
 data_collator = DataCollatorWithPadding(tokenizer=data.tokenizer)
 
 all_data = Dataset.from_generator(data.train_gen(
@@ -95,7 +95,6 @@ optimizer = Adafactor(
 )
 
 training_args = TrainingArguments(
-    log_with='tensorboard',
     output_dir=args.model_out,
     num_train_epochs=10.0,
     warmup_steps=10,

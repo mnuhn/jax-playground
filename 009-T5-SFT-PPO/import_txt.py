@@ -3,7 +3,6 @@ import prompt_db
 prompt = None
 examples = []
 
-
 db = prompt_db.prompt_db("./ollamma.db")
 
 for l in open("./ollamma.txt"):

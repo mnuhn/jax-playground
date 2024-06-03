@@ -2,6 +2,24 @@ import string
 import re
 import collections
 
+
+def combine(rule_reward, reward, rule_reward_fac, override):
+  total_reward = (1.0 -
+                  rule_reward_fac) * reward + rule_reward_fac * rule_reward
+  if override and rule_reward < 1.75:
+    total_reward *= 0.8
+  if override and rule_reward < 1.5:
+    total_reward *= 0.8
+  if override and rule_reward < 1.0:
+    total_reward *= 0.8
+  if override and rule_reward < 0.5:
+    total_reward *= 0.8
+  if override and rule_reward < 0.1:
+    total_reward *= 0.1
+    total_reward -= 0.5
+  return total_reward
+
+
 antonyms = {}
 
 for l in open("rulebased_reward_model.pairs.txt"):
@@ -118,6 +136,60 @@ def length_reward(input_str, output_str):
   return 0.1
 
 
+IS_HAS_DOES_DID = "(is|was|were|has|had|am|are|do|does|did|can|shall|must|might|should|won't)"
+IS_HAS = "(am|is|was|were|has|had|am|were|are)"
+DOES_DID = "(do|does|did|can|shall|won't)"
+NOT_REGEX = re.compile("n't")
+WORKS_WITH_NOT_REGEX = re.compile(
+    "(is|was|were|has|had|are|do|does|did|can|shall|wo|must|might|should)")
+ADJECTIVE = "(good|bad|nice|terrible|friendly|big|small|wide|narrow|here|there|open|close|[a-z]*ing)"
+REGEXES = [
+    re.compile(f'\\b{DOES_DID}(n\'t)?[a-z]{2,}'),
+    re.compile(f'\\b{DOES_DID}(n\'t)? {IS_HAS}\\b'),
+    re.compile(f'\\b{DOES_DID}(n\'t)? ([a-z]*s)\\b'),
+    re.compile(f'\\b(am|will|\'m|go)n\'t\\b'),
+    re.compile(f'n\'t[a-z]+\\b'),
+    re.compile(f'\\b{IS_HAS} {DOES_DID}(n\'t)? '),
+    re.compile(f'\\b(not) {IS_HAS}\\b'),
+    re.compile(f'\\b(an|a) (the)\\b'),
+    re.compile(f'\\b(a) ([aeiou][a-z]*)\\b'),
+    re.compile(f'\\ba {ADJECTIVE}([.?!])?$'),
+    re.compile(r'  ')
+]
+
+
+def broken_grammar(input_str, output_str):
+  input_set = set(input_str.lower().split())
+  output_str = output_str.lower()
+  if NOT_REGEX.search(
+      output_str) and not WORKS_WITH_NOT_REGEX.search(output_str):
+    return 0.1
+  for r in REGEXES:
+    if r.search(output_str):
+      return 0.1
+
+  for i in input_set:
+    if "not" + i in output_str:
+      return 0.1
+    if i + "not" in output_str:
+      return 0.1
+    if i + "n't" in output_str:
+      return 0.1
+    if "n't" + i in output_str:
+      return 0.1
+  return 1.0
+
+
+NOT = re.compile(f'(\\bnot|n\'t)( |$)')
+
+
+def avoid_not(output_str):
+  output_str = output_str.lower()
+  if NOT.search(output_str):
+    return 0.8
+  return 1.0
+
+
 def ppo_reward(input_str, output_str):
   input_str = input_str.replace("Negate:", "").strip()
   output_str = output_str.replace("Negate:", "").strip()
@@ -127,9 +199,11 @@ def ppo_reward(input_str, output_str):
   factor_a = length_reward(input_str, output_str)
   factor_a *= equality_reward(input_str, output_str)
   factor_a *= punctuation_reward(input_str, output_str)
+  factor_a *= broken_grammar(input_str, output_str)
+  factor_a *= avoid_not(output_str)
 
-  factor_b = jaccard_reward(input_str, output_str, case=True)
-  factor_b += 0.1 * jaccard_reward(input_str, output_str, case=False)
+  factor_b = jaccard_reward(input_str, output_str, case=True)**0.3
+  factor_b += 0.1 * jaccard_reward(input_str, output_str, case=False)**0.3
   factor_b += repeated_words_reward(input_str, output_str)
 
   result = factor_a * factor_b

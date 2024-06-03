@@ -5,6 +5,8 @@ class skipSet:
             Prompt_str | Response_str.
     """
     self.skip_set = set()
+    if filename is None:
+      return
     for l in open(filename, "r"):
       l = l.strip()
 

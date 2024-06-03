@@ -16,11 +16,23 @@ import random
 
 import argparse
 import force_words
+from transformers.utils import logging
+
+logging.set_verbosity_error()
 
 parser = argparse.ArgumentParser(description='add predictions to database')
 parser.add_argument('--model',
                     dest='model',
                     default="training/1713207876-final",
+                    help='which model to open')
+parser.add_argument('--print_average_reward',
+                    default=False,
+                    type=bool,
+                    help='which model to open')
+parser.add_argument('--rule_reward_fac',
+                    dest='rule_reward_fac',
+                    default=0.01,
+                    type=float,
                     help='which model to open')
 parser.add_argument('--low_rule_reward_override',
                     dest='low_rule_reward_override',
@@ -53,7 +65,7 @@ parser.add_argument('--num_to_generate_per_type',
                     help='number of completions per prompt')
 parser.add_argument('--num_to_keep_per_type',
                     dest='num_to_keep_per_type',
-                    default=5,
+                    default=3,
                     type=int,
                     help='number of completions per prompt')
 parser.add_argument('--num_beams',
@@ -63,7 +75,7 @@ parser.add_argument('--num_beams',
                     help='number of completions per prompt')
 parser.add_argument('--max_len',
                     dest='max_len',
-                    default=50,
+                    default=100,
                     type=int,
                     help='maximum length')
 parser.add_argument('--prompts',
@@ -76,6 +88,13 @@ parser.add_argument('--interactive',
                     help='file with prompts')
 
 args = parser.parse_args()
+
+if args.interactive:
+  print("""
+     __   __   __   __   __    ___  ___     ___
+    /  \ |__) |__) /  \ /__` |  |  |__  \_/  |
+    \__/ |    |    \__/ .__/ |  |  |___ / \  |
+ """)
 
 tokenizer = AutoTokenizer.from_pretrained("t5-small")
 model = AutoModelForSeq2SeqLM.from_pretrained(args.model)
@@ -159,7 +178,7 @@ def predict(m, input_str, input_ids, force_words_ids, bad_words_ids, name):
 
 
 if args.interactive:
-  pbar = tqdm(sys.stdin)
+  pbar = sys.stdin
 else:
   pbar = tqdm(prompts)
 
@@ -167,10 +186,27 @@ added_comparisons = 0
 sum1 = 0
 sum2 = 0
 cnt = 0
+
+GREEN = '\033[92m'
+BOLD = '\033[91m\033[1m'
+END = '\033[0m'
+
+
+def maybe_print_prompt():
+  if args.interactive:
+    print()
+    print()
+    print(f"➡️  {GREEN}", end='', flush=True)
+
+
+maybe_print_prompt()
 for input_str in pbar:
   cnt += 1
   prompt_id = None
-  pbar.set_description(f"Processing: '{input_str}'")
+  if args.interactive:
+    print(END, end='', flush=True)
+  else:
+    pbar.set_description(f"Processing: '{input_str}'")
   if db:
     prompt_id = db.add_prompt(input_str)
   prompt_str = f"Negate:\n{input_str}"
@@ -184,7 +220,7 @@ for input_str in pbar:
   #force_words = None
   #force_words = tokenizer([sys.stdin.readline()], add_special_tokens=False).input_ids
 
-  force_words_ids = [("default", None, None)]
+  force_words_ids = [("std", None, None)]
 
   if args.force_antonyms:
     force_words_ids.append(
@@ -196,8 +232,8 @@ for input_str in pbar:
   results = []
   results2 = []
   for name, cur_force_words_ids, cur_bad_words_ids in force_words_ids:
-    print(cur_force_words_ids)
-    cur_results = predict(model, input_str,
+    cur_results = predict(model,
+                          input_str,
                           input_ids,
                           cur_force_words_ids,
                           cur_bad_words_ids,
@@ -206,7 +242,8 @@ for input_str in pbar:
       results.extend(cur_results)
 
     if model2:
-      cur_results = predict(model2, input_str,
+      cur_results = predict(model2,
+                            input_str,
                             input_ids,
                             cur_force_words_ids,
                             cur_bad_words_ids,
@@ -216,53 +253,75 @@ for input_str in pbar:
 
   results = sorted(results, key=lambda x: x[3], reverse=True)
   results2 = sorted(results2, key=lambda x: x[3], reverse=True)
-  print()
-  print(prompt_str.replace("Negate:\n", ""))
   i = 0
   previous_str = None
-  print("num overall_score reward rule_reward | name | output_str")
+  print()
+  print("MM | ### |  score | comb rwd | ML rwd | rule rwd | output_str")
   pos = 0
 
-  def print_result(i, output_str, reward, rule_reward, overall_score, name, prefix=""):
-    total_reward = rule_reward * 0.05 + 0.95 * reward
-    if args.low_rule_reward_override and rule_reward < 1.0:
-      total_reward *= 0.8
-    if args.low_rule_reward_override and rule_reward < 0.1:
-      total_reward *= 0.1
-      total_reward -= 0.2
+  def print_result(i,
+                   output_str,
+                   reward,
+                   rule_reward,
+                   overall_score,
+                   name,
+                   prefix=""):
+    total_reward = rulebased_reward_model.combine(rule_reward, reward,
+                                                  args.rule_reward_fac,
+                                                  args.low_rule_reward_override)
     if counts[name] >= args.num_to_keep_per_type:
       return None, total_reward
 
     counts[name] += 1
+
+    if args.interactive:
+      output_str = BOLD + output_str + END
     print(
-            f'{prefix}{i:03d} {overall_score:10.4f} {overall_score:10.4f} {total_reward:10.4f} {reward:10.4f} {rule_reward:10.4f} | {name} | {output_str}'
+        f'{prefix}  {i:03d}  {overall_score:7.3f}   {total_reward:8.4f} {reward:8.4f}   {rule_reward:8.4f} | {output_str}'
     )
 
     if db:
-      return db.add_completion(prompt_id, name, output_str, reward, rule_reward,
-                        overall_score), total_reward
+      completion_id = db.add_completion(prompt_id, name, output_str, reward,
+                                        rule_reward, overall_score)
+      print(prompt_id, completion_id)
+      return completion_id, total_reward
+
     return None, total_reward
 
-  print(f"Model 1: Avg reward {sum1/cnt}")
+  if args.print_average_reward:
+    print(f"Model 1: Avg reward {sum1/cnt}")
+
   i = 0
   counts = defaultdict(int)
   results_ids = []
   for output_str, reward, rule_reward, overall_score, name in results:
-    cur_id, total_reward = print_result(i, output_str, reward, rule_reward, overall_score, name, prefix="M1 ")
+    cur_id, total_reward = print_result(i,
+                                        output_str,
+                                        reward,
+                                        rule_reward,
+                                        overall_score,
+                                        name,
+                                        prefix="M1 ")
     sum1 += total_reward
     results_ids.append(cur_id)
     i += 1
 
   results = [r + (r2,) for r, r2 in zip(results, results_ids)]
   results = [x for x in results if x[-1] is not None]
-  print(results)
 
-  print(f"Model 2: Avg reward {sum2/cnt}")
+  if args.model2 and args.print_average_reward:
+    print(f"Model 2: Avg reward {sum2/cnt}")
   i = 0
   counts = defaultdict(int)
   results2_ids = []
   for output_str, reward, rule_reward, overall_score, name in results2:
-    cur_id, total_reward = print_result(i, output_str, reward, rule_reward, overall_score, name, prefix="M2 ")
+    cur_id, total_reward = print_result(i,
+                                        output_str,
+                                        reward,
+                                        rule_reward,
+                                        overall_score,
+                                        name,
+                                        prefix="M2 ")
     sum2 += total_reward
     results2_ids.append(cur_id)
     i += 1
@@ -276,8 +335,10 @@ for input_str in pbar:
       print(best, worst)
       if db:
         added_comparisons += 1
-        db.add_comparison(prompt_id, best[-1], worst[-1], 1.1, 0.0)
+        print("not adding comparison to db")
+        # db.add_comparison(prompt_id, best[-1], worst[-1], 1.1, 0.0)
 
   if db:
     db.conn.commit()
-  print("added comparisons", added_comparisons)
+    print("added comparisons", added_comparisons)
+  maybe_print_prompt()

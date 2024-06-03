@@ -9,9 +9,9 @@ for wd in 0.0; do
             TRAIN_ALL_PARAMETERS_EXTRA=""
           fi
           python3 train_reward.py \
-            --db=data/mix22.extended.txt.model2-final.8antonyms-lenthwiggle.ppo-final.multidecode.db.backup \
-            --model=data/mix22.extended.txt.model2-final \
-            --out_model=data/mix22.extended.txt.model2-final.scan-reward \
+            --db=./data/mix24.reward.merged_ratings.db \
+            --model=./data/mix23.txt.model-final \
+            --out_model=data/mix24.reward.merged_ratings.db.scan-reward \
             --margin=${margin} \
             --learning_rate=$lr \
             --weight_decay=$wd \

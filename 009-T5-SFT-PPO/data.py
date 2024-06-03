@@ -41,23 +41,32 @@ def train_gen(training_data):
         yield {"source_text": f"Negate:\n{t}", "target_text": f"{s}"}
 
         if s.isalpha() and t.isalpha():
-          suffix_id = int(hashlib.sha256((s+t).encode("utf-8")).hexdigest(), 16) % 3
-          p = [".", "!", "..."][suffix_id]
-          if (s+p, t+p) not in pairs:
-            pairs.add((s+p,t+p))
-            yield {"source_text": f"Negate:\n{s}{p}", "target_text": f"{t}{p}"}
-            yield {"source_text": f"Negate:\n{t}{p}", "target_text": f"{s}{p}"}
+          suffix_id = int(
+              hashlib.sha256((s + t).encode("utf-8")).hexdigest(), 16) % 6
+          if suffix_id < 3:
+            p = [".", "!", "..."][suffix_id]
+            if (s + p, t + p) not in pairs:
+              pairs.add((s + p, t + p))
+              yield {
+                  "source_text": f"Negate:\n{s}{p}",
+                  "target_text": f"{t}{p}"
+              }
+              yield {
+                  "source_text": f"Negate:\n{t}{p}",
+                  "target_text": f"{s}{p}"
+              }
 
-      yield from add_pair(s,t)
-      casing = int(hashlib.sha256((s+t).encode("utf-8")).hexdigest(), 16) % 3
+      yield from add_pair(s, t)
+      casing = int(hashlib.sha256((s + t).encode("utf-8")).hexdigest(), 16) % 6
       if casing == 0:
-        yield from add_pair(s.lower(),t.lower())
+        yield from add_pair(s.lower(), t.lower())
       elif casing == 1:
-        yield from add_pair(s.upper(),t.upper())
+        yield from add_pair(s.upper(), t.upper())
       elif casing == 2:
-        yield from add_pair(s.title(),t.title())
+        yield from add_pair(s.title(), t.title())
 
   return gen
+
 
 def tokenize_pairwise_function(example):
 

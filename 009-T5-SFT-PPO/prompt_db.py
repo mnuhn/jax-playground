@@ -112,7 +112,6 @@ class prompt_db:
                 "rejected_text": f'{c1_merged}'
             }
 
-
     return gen
 
   def retrieve_random_pair(self):
@@ -125,10 +124,12 @@ class prompt_db:
 			c1.name AS name1,
 			c1.completion AS completion1_text,
 			c1.score AS score1,
+			c1.reward AS reward1,
 			c2.id AS completion2_id,
 			c2.name AS name2,
 			c2.completion AS completion2_text,
 			c2.score AS score2,
+			c2.reward AS reward2,
 			ABS(c1.score - c2.score) AS score_difference
 		FROM 
 			prompts p
@@ -138,27 +139,35 @@ class prompt_db:
 			completions c2 ON p.id = c2.pid
 		LEFT JOIN 
 			comparisons comp ON (
-				comp.pid = p.id)
+				comp.pid = p.id AND (
+                    (comp.cid1 = c1.id OR comp.cid2 = c1.id)
+                    OR
+                    (comp.cid1 = c2.id OR comp.cid2 = c2.id)
+                )
+            )
 		WHERE 
 			c1.id <> c2.id
+            AND c1.rule_reward > 1.5
+            AND c2.rule_reward > 1.5
 			AND c1.name = 'default'
 			AND c2.name = 'default'
 			AND c1.completion <> c2.completion
 			AND p.prompt <> c1.completion
-            AND LENGTH(c2.completion) > 2 * LENGTH(c1.completion)
-            AND LENGTH(c2.completion) > 2 * LENGTH(p.prompt)
+      --      AND LENGTH(c2.completion) > 2 * LENGTH(c1.completion)
+      --      AND LENGTH(c2.completion) > 2 * LENGTH(p.prompt)
 			AND comp.id IS NULL
 		ORDER BY
+            p.id DESC,
             LENGTH(p.prompt) ASC,
-            c1.score DESC,
-            abs(c1.score-c2.score) DESC
+            ROUND(c1.score*100) DESC,
+            abs(c1.score-c2.score) ASC
 		LIMIT 1""")
-    pid, prompt_str, cid1, name1, completion1, score1, cid2, name2, completion2, score2, _ = cursor.fetchone(
+    pid, prompt_str, cid1, name1, completion1, score1, reward1, cid2, name2, completion2, score2, reward2, _ = cursor.fetchone(
     )
     print("done")
     print(name1, name2)
 
-    return pid, prompt_str, cid1, completion1, score1, cid2, completion2, score2
+    return pid, prompt_str, cid1, completion1, score1, reward1, cid2, completion2, score2, reward2
 
   def retrieve_prompt(self):
     cursor = self.conn.execute("""

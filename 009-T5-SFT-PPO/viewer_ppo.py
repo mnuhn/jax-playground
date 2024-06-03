@@ -30,7 +30,7 @@ db = prompt_db.prompt_db(args.db)
 def retrieve_random_pair():
   FONTSIZE = "3vw"
   print("retrieve prompt")
-  pid, prompt_str, cid1, completion1, score1, cid2, completion2, score2 = db.retrieve_random_pair(
+  pid, prompt_str, cid1, completion1, score1, reward1, cid2, completion2, score2, reward2 = db.retrieve_random_pair(
   )
   prompt_words = set(prompt_str.split())
   prompt_words_lower = set(prompt_str.lower().split())
@@ -61,9 +61,9 @@ def retrieve_random_pair():
   completions = [(-1, "NONE", -1, -1)]
 
   counter = 1
-  for cid, completion, score, other in [
-      (cid1, completion1, score1, completion2),
-      (cid2, completion2, score2, completion1)
+  for cid, completion, score, reward, other in [
+      (cid1, completion1, score1, reward1, completion2),
+      (cid2, completion2, score2, reward2, completion1)
   ]:
     other = set(other.lower().split())
     completion_html = ""
@@ -86,7 +86,7 @@ def retrieve_random_pair():
       space = " "
 
     completion_html = completion_html.strip()
-    output += f'{counter}. score={score:.2f}'
+    output += f'{counter}. score={score:.2f} reward={reward:.2f}'
     output += f'<label for="{cid}" style="font-size: {FONTSIZE}">'
     output += '<div style="border-style: dashed;">'
     output += f'{completion_html}'
